@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  readur:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://readur:readur_password@postgres:5432/readur
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - UPLOAD_PATH=/app/uploads
+      - WATCH_FOLDER=/app/watch
+    volumes:
+      - uploads:/app/uploads
+      - watch:/app/watch
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=readur
+      - POSTGRES_PASSWORD=readur_password
+      - POSTGRES_DB=readur
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  watch:
+  postgres_data:
