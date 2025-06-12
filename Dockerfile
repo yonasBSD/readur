@@ -1,5 +1,14 @@
-# Build stage
-FROM rust:1.83-bookworm as builder
+# --- Frontend build stage ---
+FROM node:20-bookworm as frontend-builder
+
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend ./
+RUN npm run build
+
+# --- Backend build stage ---
+FROM rust:1.83-bookworm as backend-builder
 
 # Install system dependencies for OCR
 RUN apt-get update && apt-get install -y \
@@ -15,10 +24,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY Cargo.toml ./
 COPY src ./src
-
 RUN cargo build --release
 
-# Runtime stage
+# --- Runtime stage ---
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
@@ -30,14 +38,14 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy the binary
-COPY --from=builder /app/target/release/readur /app/readur
+# Copy backend binary
+COPY --from=backend-builder /app/target/release/readur /app/readur
 
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/watch /app/frontend
 
-# Copy frontend files (will be built separately)
-COPY frontend/dist /app/frontend
+# Copy built frontend from frontend-builder
+COPY --from=frontend-builder /frontend/dist /app/frontend
 
 EXPOSE 8000
 
