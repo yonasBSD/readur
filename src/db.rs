@@ -17,11 +17,18 @@ impl Database {
     }
 
     pub async fn migrate(&self) -> Result<()> {
+        // Create extensions
+        sqlx::query(r#"CREATE EXTENSION IF NOT EXISTS "uuid-ossp""#)
+            .execute(&self.pool)
+            .await?;
+        
+        sqlx::query(r#"CREATE EXTENSION IF NOT EXISTS "pg_trgm""#)
+            .execute(&self.pool)
+            .await?;
+        
+        // Create users table
         sqlx::query(
             r#"
-            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-            CREATE EXTENSION IF NOT EXISTS "pg_trgm";
-            
             CREATE TABLE IF NOT EXISTS users (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 username VARCHAR(255) UNIQUE NOT NULL,
@@ -29,8 +36,15 @@ impl Database {
                 password_hash VARCHAR(255) NOT NULL,
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
-            );
-
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        
+        // Create documents table
+        sqlx::query(
+            r#"
             CREATE TABLE IF NOT EXISTS documents (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 filename VARCHAR(255) NOT NULL,
@@ -44,17 +58,32 @@ impl Database {
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW(),
                 user_id UUID REFERENCES users(id) ON DELETE CASCADE
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);
-            CREATE INDEX IF NOT EXISTS idx_documents_filename ON documents(filename);
-            CREATE INDEX IF NOT EXISTS idx_documents_mime_type ON documents(mime_type);
-            CREATE INDEX IF NOT EXISTS idx_documents_tags ON documents USING GIN(tags);
-            CREATE INDEX IF NOT EXISTS idx_documents_content_search ON documents USING GIN(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')));
-            "#
+            )
+            "#,
         )
         .execute(&self.pool)
         .await?;
+        
+        // Create indexes
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id)"#)
+            .execute(&self.pool)
+            .await?;
+        
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_documents_filename ON documents(filename)"#)
+            .execute(&self.pool)
+            .await?;
+        
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_documents_mime_type ON documents(mime_type)"#)
+            .execute(&self.pool)
+            .await?;
+        
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_documents_tags ON documents USING GIN(tags)"#)
+            .execute(&self.pool)
+            .await?;
+        
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_documents_content_search ON documents USING GIN(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')))"#)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }

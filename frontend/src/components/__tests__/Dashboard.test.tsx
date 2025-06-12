@@ -9,6 +9,7 @@ vi.mock('../../services/api', () => ({
     list: vi.fn(),
     search: vi.fn(),
   },
+  api: {},
 }))
 
 // Mock child components
@@ -65,8 +66,7 @@ describe('Dashboard', () => {
   })
 
   test('renders dashboard with file upload and document list', async () => {
-    const mockList = vi.mocked(documentService.list)
-    mockList.mockResolvedValue({ data: mockDocuments })
+    (documentService.list as any).mockResolvedValue({ data: mockDocuments })
 
     render(<Dashboard />)
 
@@ -81,8 +81,7 @@ describe('Dashboard', () => {
   })
 
   test('handles loading state', () => {
-    const mockList = vi.mocked(documentService.list)
-    mockList.mockImplementation(() => new Promise(() => {})) // Never resolves
+    (documentService.list as any).mockImplementation(() => new Promise(() => {})) // Never resolves
 
     render(<Dashboard />)
 
@@ -90,11 +89,8 @@ describe('Dashboard', () => {
   })
 
   test('handles search functionality', async () => {
-    const mockList = vi.mocked(documentService.list)
-    const mockSearch = vi.mocked(documentService.search)
-    
-    mockList.mockResolvedValue({ data: mockDocuments })
-    mockSearch.mockResolvedValue({
+    (documentService.list as any).mockResolvedValue({ data: mockDocuments });
+    (documentService.search as any).mockResolvedValue({
       data: {
         documents: [mockDocuments[0]],
         total: 1,
@@ -111,7 +107,7 @@ describe('Dashboard', () => {
     searchBar.dispatchEvent(new Event('change', { bubbles: true }))
 
     await waitFor(() => {
-      expect(mockSearch).toHaveBeenCalled()
+      expect(documentService.search).toHaveBeenCalled()
     })
   })
 })

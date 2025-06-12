@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::file_service::FileService;
+    use crate::file_service::FileService;
     use std::fs;
     use tempfile::TempDir;
     use uuid::Uuid;
@@ -51,8 +51,13 @@ mod tests {
         assert!(result.is_ok());
         
         let file_path = result.unwrap();
-        // Should not have an extension
-        assert!(!file_path.contains('.'));
+        // Should not have an extension (check just the filename part)
+        let filename_part = std::path::Path::new(&file_path)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(!filename_part.contains('.'));
     }
 
     #[test]

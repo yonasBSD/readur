@@ -39,7 +39,7 @@ impl FileService {
         Ok(file_path.to_string_lossy().to_string())
     }
 
-    pub async fn create_document(
+    pub fn create_document(
         &self,
         filename: &str,
         original_filename: &str,

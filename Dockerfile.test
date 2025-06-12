@@ -1,0 +1,20 @@
+# Test stage
+FROM rust:1.75
+
+# Install system dependencies for OCR and PostgreSQL client
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    libtesseract-dev \
+    libleptonica-dev \
+    pkg-config \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the entire project
+COPY . .
+
+# Build the project and run tests
+CMD ["cargo", "test"]

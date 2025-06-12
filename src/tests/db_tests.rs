@@ -1,24 +1,28 @@
 #[cfg(test)]
 mod tests {
-    use super::super::db::Database;
-    use super::super::models::{CreateUser, Document, SearchRequest};
+    use crate::db::Database;
+    use crate::models::{CreateUser, Document, SearchRequest};
     use chrono::Utc;
-    use tempfile::NamedTempFile;
     use uuid::Uuid;
 
     async fn create_test_db() -> Database {
-        let temp_file = NamedTempFile::new().unwrap();
-        let db_url = format!("sqlite://{}", temp_file.path().display());
+        // Use an in-memory database URL for testing
+        // This will require PostgreSQL to be running for integration tests
+        let db_url = std::env::var("TEST_DATABASE_URL")
+            .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/readur_test".to_string());
         
-        let db = Database::new(&db_url).await.unwrap();
-        db.migrate().await.unwrap();
+        let db = Database::new(&db_url).await.expect("Failed to connect to test database");
+        
+        // Run migrations for test database
+        db.migrate().await.expect("Failed to migrate test database");
+        
         db
     }
 
-    fn create_test_user_data() -> CreateUser {
+    fn create_test_user_data(suffix: &str) -> CreateUser {
         CreateUser {
-            username: "testuser".to_string(),
-            email: "test@example.com".to_string(),
+            username: format!("testuser_{}", suffix),
+            email: format!("test_{}@example.com", suffix),
             password: "password123".to_string(),
         }
     }
@@ -41,28 +45,30 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL database"]
     async fn test_create_user() {
         let db = create_test_db().await;
-        let user_data = create_test_user_data();
+        let user_data = create_test_user_data("1");
         
         let result = db.create_user(user_data).await;
         assert!(result.is_ok());
         
         let user = result.unwrap();
-        assert_eq!(user.username, "testuser");
+        assert_eq!(user.username, "testuser_1");
         assert_eq!(user.email, "test@example.com");
         assert!(!user.password_hash.is_empty());
         assert_ne!(user.password_hash, "password123"); // Should be hashed
     }
 
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL database"]
     async fn test_get_user_by_username() {
         let db = create_test_db().await;
-        let user_data = create_test_user_data();
+        let user_data = create_test_user_data("1");
         
         let created_user = db.create_user(user_data).await.unwrap();
         
-        let result = db.get_user_by_username("testuser").await;
+        let result = db.get_user_by_username("testuser_1").await;
         assert!(result.is_ok());
         
         let found_user = result.unwrap();
@@ -70,10 +76,11 @@ mod tests {
         
         let user = found_user.unwrap();
         assert_eq!(user.id, created_user.id);
-        assert_eq!(user.username, "testuser");
+        assert_eq!(user.username, "testuser_1");
     }
 
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL database"]
     async fn test_get_user_by_username_not_found() {
         let db = create_test_db().await;
         
@@ -85,9 +92,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL database"]
     async fn test_create_document() {
         let db = create_test_db().await;
-        let user_data = create_test_user_data();
+        let user_data = create_test_user_data("1");
         let user = db.create_user(user_data).await.unwrap();
         
         let document = create_test_document(user.id);
@@ -101,9 +109,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL database"]
     async fn test_get_documents_by_user() {
         let db = create_test_db().await;
-        let user_data = create_test_user_data();
+        let user_data = create_test_user_data("1");
         let user = db.create_user(user_data).await.unwrap();
         
         let document1 = create_test_document(user.id);
@@ -120,9 +129,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL database"]
     async fn test_search_documents() {
         let db = create_test_db().await;
-        let user_data = create_test_user_data();
+        let user_data = create_test_user_data("1");
         let user = db.create_user(user_data).await.unwrap();
         
         let mut document = create_test_document(user.id);
@@ -148,9 +158,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL database"]
     async fn test_update_document_ocr() {
         let db = create_test_db().await;
-        let user_data = create_test_user_data();
+        let user_data = create_test_user_data("1");
         let user = db.create_user(user_data).await.unwrap();
         
         let document = create_test_document(user.id);

@@ -39,7 +39,7 @@ pub struct UserResponse {
     pub email: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Document {
     pub id: Uuid,
     pub filename: String,

@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - TEST_DATABASE_URL=postgresql://readur:readur_password@test-postgres:5432/readur_test
+      - RUST_BACKTRACE=1
+    depends_on:
+      test-postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./Cargo.toml:/app/Cargo.toml
+      - ./Cargo.lock:/app/Cargo.lock
+
+  test-postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=readur
+      - POSTGRES_PASSWORD=readur_password
+      - POSTGRES_DB=readur_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U readur"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

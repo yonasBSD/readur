@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use super::super::auth::{create_jwt, verify_jwt};
-    use super::super::models::User;
+    use crate::auth::{create_jwt, verify_jwt};
+    use crate::models::User;
     use chrono::Utc;
     use uuid::Uuid;
 

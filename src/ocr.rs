@@ -10,9 +10,8 @@ impl OcrService {
     }
 
     pub async fn extract_text_from_image(&self, file_path: &str) -> Result<String> {
-        let mut tesseract = Tesseract::new(None, Some("eng"))?;
-        
-        tesseract.set_image(file_path)?;
+        let mut tesseract = Tesseract::new(None, Some("eng"))?
+            .set_image(file_path)?;
         
         let text = tesseract.get_text()?;
         
@@ -47,7 +46,7 @@ impl OcrService {
         }
     }
 
-    fn is_image_file(&self, file_path: &str) -> bool {
+    pub fn is_image_file(&self, file_path: &str) -> bool {
         if let Some(extension) = Path::new(file_path)
             .extension()
             .and_then(|ext| ext.to_str())

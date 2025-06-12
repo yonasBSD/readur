@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tower_http::cors::CorsLayer;
+use tower_http::{cors::CorsLayer, services::ServeDir};
 use tracing::{info, error};
 
 mod auth;
@@ -16,6 +16,7 @@ mod file_service;
 mod models;
 mod ocr;
 mod routes;
+mod seed;
 mod watcher;
 
 #[cfg(test)]
@@ -32,12 +33,15 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::init();
+    tracing_subscriber::fmt::init();
     
     let config = Config::from_env()?;
     let db = Database::new(&config.database_url).await?;
     
     db.migrate().await?;
+    
+    // Seed admin user
+    seed::seed_admin_user(&db).await?;
     
     let state = AppState { db, config: config.clone() };
     
@@ -46,6 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api/auth", routes::auth::router())
         .nest("/api/documents", routes::documents::router())
         .nest("/api/search", routes::search::router())
+        .nest_service("/", ServeDir::new("/app/frontend"))
         .layer(CorsLayer::permissive())
         .with_state(Arc::new(state));
     

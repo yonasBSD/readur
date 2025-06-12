@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.75 as builder
+FROM rust:1.83-bookworm as builder
 
 # Install system dependencies for OCR
 RUN apt-get update && apt-get install -y \
@@ -8,10 +8,12 @@ RUN apt-get update && apt-get install -y \
     libtesseract-dev \
     libleptonica-dev \
     pkg-config \
+    libclang-dev \
+    clang \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 COPY src ./src
 
 RUN cargo build --release
