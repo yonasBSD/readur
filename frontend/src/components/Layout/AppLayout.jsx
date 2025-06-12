@@ -34,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import GlobalSearchBar from '../GlobalSearchBar';
 
 const drawerWidth = 280;
 
@@ -199,9 +200,14 @@ export default function AppLayout({ children }) {
             <MenuIcon />
           </IconButton>
           
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
+          <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600, mr: 2 }}>
             {navigationItems.find(item => item.path === location.pathname)?.text || 'Dashboard'}
           </Typography>
+
+          {/* Global Search Bar */}
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', mr: 2 }}>
+            <GlobalSearchBar />
+          </Box>
 
           {/* Notifications */}
           <IconButton color="inherit" sx={{ mr: 1 }}>

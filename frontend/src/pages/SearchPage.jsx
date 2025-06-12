@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -61,7 +61,8 @@ import { documentService } from '../services/api';
 
 const SearchPage = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -183,6 +184,14 @@ const SearchPage = () => {
     [performSearch]
   );
 
+  // Handle URL search params
+  useEffect(() => {
+    const queryFromUrl = searchParams.get('q');
+    if (queryFromUrl && queryFromUrl !== searchQuery) {
+      setSearchQuery(queryFromUrl);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     const filters = {
       tags: selectedTags,
@@ -192,7 +201,14 @@ const SearchPage = () => {
       hasOcr: hasOcr,
     };
     debouncedSearch(searchQuery, filters);
-  }, [searchQuery, selectedTags, selectedMimeTypes, dateRange, fileSizeRange, hasOcr, debouncedSearch]);
+    
+    // Update URL params when search query changes
+    if (searchQuery) {
+      setSearchParams({ q: searchQuery });
+    } else {
+      setSearchParams({});
+    }
+  }, [searchQuery, selectedTags, selectedMimeTypes, dateRange, fileSizeRange, hasOcr, debouncedSearch, setSearchParams]);
 
   const handleClearFilters = () => {
     setSelectedTags([]);
