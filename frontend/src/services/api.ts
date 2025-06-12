@@ -1,11 +1,14 @@
 import axios from 'axios'
 
-export const api = axios.create({
+const api = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
 })
+
+export { api }
+export default api
 
 export interface Document {
   id: string

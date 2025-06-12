@@ -1,0 +1,354 @@
+import React, { useState, useCallback } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  LinearProgress,
+  Chip,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemSecondaryAction,
+  IconButton,
+  Alert,
+  Paper,
+  alpha,
+  useTheme,
+} from '@mui/material';
+import {
+  CloudUpload as UploadIcon,
+  InsertDriveFile as FileIcon,
+  CheckCircle as CheckIcon,
+  Error as ErrorIcon,
+  Delete as DeleteIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
+import { useDropzone } from 'react-dropzone';
+import api from '../../services/api';
+
+const UploadZone = ({ onUploadComplete }) => {
+  const theme = useTheme();
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
+    setError('');
+    
+    // Handle rejected files
+    if (rejectedFiles.length > 0) {
+      const errors = rejectedFiles.map(file => 
+        `${file.file.name}: ${file.errors.map(e => e.message).join(', ')}`
+      );
+      setError(`Some files were rejected: ${errors.join('; ')}`);
+    }
+
+    // Add accepted files to the list
+    const newFiles = acceptedFiles.map(file => ({
+      file,
+      id: Math.random().toString(36).substr(2, 9),
+      status: 'pending', // pending, uploading, success, error
+      progress: 0,
+      error: null,
+    }));
+
+    setFiles(prev => [...prev, ...newFiles]);
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff'],
+      'text/*': ['.txt', '.rtf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    },
+    maxSize: 50 * 1024 * 1024, // 50MB
+    multiple: true,
+  });
+
+  const removeFile = (fileId) => {
+    setFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  const uploadFile = async (fileItem) => {
+    const formData = new FormData();
+    formData.append('file', fileItem.file);
+
+    try {
+      setFiles(prev => prev.map(f => 
+        f.id === fileItem.id 
+          ? { ...f, status: 'uploading', progress: 0 }
+          : f
+      ));
+
+      const response = await api.post('/documents/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setFiles(prev => prev.map(f => 
+            f.id === fileItem.id 
+              ? { ...f, progress }
+              : f
+          ));
+        },
+      });
+
+      setFiles(prev => prev.map(f => 
+        f.id === fileItem.id 
+          ? { ...f, status: 'success', progress: 100 }
+          : f
+      ));
+
+      if (onUploadComplete) {
+        onUploadComplete(response.data);
+      }
+    } catch (error) {
+      setFiles(prev => prev.map(f => 
+        f.id === fileItem.id 
+          ? { 
+              ...f, 
+              status: 'error', 
+              error: error.response?.data?.message || 'Upload failed',
+              progress: 0,
+            }
+          : f
+      ));
+    }
+  };
+
+  const uploadAllFiles = async () => {
+    setUploading(true);
+    setError('');
+
+    const pendingFiles = files.filter(f => f.status === 'pending' || f.status === 'error');
+    
+    try {
+      await Promise.all(pendingFiles.map(uploadFile));
+    } catch (error) {
+      setError('Some uploads failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const retryUpload = (fileItem) => {
+    uploadFile(fileItem);
+  };
+
+  const clearCompleted = () => {
+    setFiles(prev => prev.filter(f => f.status !== 'success'));
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'success': return theme.palette.success.main;
+      case 'error': return theme.palette.error.main;
+      case 'uploading': return theme.palette.primary.main;
+      default: return theme.palette.text.secondary;
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'success': return <CheckIcon />;
+      case 'error': return <ErrorIcon />;
+      case 'uploading': return <UploadIcon />;
+      default: return <FileIcon />;
+    }
+  };
+
+  return (
+    <Box>
+      {/* Upload Drop Zone */}
+      <Card 
+        elevation={0}
+        sx={{ 
+          mb: 3,
+          border: `2px dashed ${isDragActive ? theme.palette.primary.main : theme.palette.divider}`,
+          backgroundColor: isDragActive ? alpha(theme.palette.primary.main, 0.04) : 'transparent',
+          transition: 'all 0.2s ease-in-out',
+        }}
+      >
+        <CardContent>
+          <Box
+            {...getRootProps()}
+            sx={{
+              textAlign: 'center',
+              py: 6,
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <input {...getInputProps()} />
+            
+            <UploadIcon 
+              sx={{ 
+                fontSize: 64, 
+                color: isDragActive ? 'primary.main' : 'text.secondary',
+                mb: 2,
+              }} 
+            />
+            
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+              {isDragActive ? 'Drop files here' : 'Drag & drop files here'}
+            </Typography>
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              or click to browse your computer
+            </Typography>
+            
+            <Button 
+              variant="contained" 
+              sx={{ 
+                mb: 2,
+                borderRadius: 2,
+                px: 3,
+              }}
+            >
+              Choose Files
+            </Button>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Chip label="PDF" size="small" variant="outlined" />
+              <Chip label="Images" size="small" variant="outlined" />
+              <Chip label="Text" size="small" variant="outlined" />
+              <Chip label="Word" size="small" variant="outlined" />
+            </Box>
+            
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+              Maximum file size: 50MB per file
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* File List */}
+      {files.length > 0 && (
+        <Card elevation={0}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Files ({files.length})
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  size="small"
+                  onClick={clearCompleted}
+                  disabled={!files.some(f => f.status === 'success')}
+                >
+                  Clear Completed
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={uploadAllFiles}
+                  disabled={uploading || !files.some(f => f.status === 'pending' || f.status === 'error')}
+                  sx={{ borderRadius: 2 }}
+                >
+                  {uploading ? 'Uploading...' : 'Upload All'}
+                </Button>
+              </Box>
+            </Box>
+
+            <List sx={{ p: 0 }}>
+              {files.map((fileItem, index) => (
+                <ListItem 
+                  key={fileItem.id}
+                  sx={{ 
+                    px: 0,
+                    py: 2,
+                    borderBottom: index < files.length - 1 ? 1 : 0,
+                    borderColor: 'divider',
+                  }}
+                >
+                  <ListItemIcon>
+                    <Box sx={{ color: getStatusColor(fileItem.status) }}>
+                      {getStatusIcon(fileItem.status)}
+                    </Box>
+                  </ListItemIcon>
+                  
+                  <ListItemText
+                    primary={
+                      <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
+                        {fileItem.file.name}
+                      </Typography>
+                    }
+                    secondary={
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatFileSize(fileItem.file.size)}
+                        </Typography>
+                        {fileItem.status === 'uploading' && (
+                          <Box sx={{ mt: 1 }}>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={fileItem.progress}
+                              sx={{ height: 4, borderRadius: 2 }}
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                              {fileItem.progress}%
+                            </Typography>
+                          </Box>
+                        )}
+                        {fileItem.error && (
+                          <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                            {fileItem.error}
+                          </Typography>
+                        )}
+                      </Box>
+                    }
+                  />
+                  
+                  <ListItemSecondaryAction>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      {fileItem.status === 'error' && (
+                        <IconButton 
+                          size="small" 
+                          onClick={() => retryUpload(fileItem)}
+                          sx={{ color: 'primary.main' }}
+                        >
+                          <RefreshIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      <IconButton 
+                        size="small" 
+                        onClick={() => removeFile(fileItem.id)}
+                        disabled={fileItem.status === 'uploading'}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      )}
+    </Box>
+  );
+};
+
+export default UploadZone;
