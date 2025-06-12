@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::Semaphore;
 use tracing::{error, info, warn};
@@ -66,18 +67,19 @@ impl BatchIngester {
         info!("Found {} files to ingest", file_paths.len());
         
         // Process files in batches
-        let semaphore = Semaphore::new(self.max_concurrent_io);
+        let semaphore = Arc::new(Semaphore::new(self.max_concurrent_io));
         let mut batch = Vec::new();
         let mut queue_items = Vec::new();
         
         for (idx, path) in file_paths.iter().enumerate() {
-            let permit = semaphore.acquire().await?;
+            let semaphore_clone = semaphore.clone();
             let path_clone = path.clone();
             let file_service = self.file_service.clone();
             let user_id_clone = user_id;
             
             // Process file asynchronously
             let handle = tokio::spawn(async move {
+                let permit = semaphore_clone.acquire().await.unwrap();
                 let _permit = permit;
                 process_single_file(path_clone, file_service, user_id_clone).await
             });
@@ -210,11 +212,15 @@ async fn process_single_file(
 
 fn calculate_priority(file_size: i64) -> i32 {
     const MB: i64 = 1024 * 1024;
+    const MB5: i64 = 5 * 1024 * 1024;
+    const MB10: i64 = 10 * 1024 * 1024;
+    const MB50: i64 = 50 * 1024 * 1024;
+    
     match file_size {
         0..=MB => 10,           // <= 1MB: highest priority
-        ..=5 * MB => 8,         // 1-5MB: high priority
-        ..=10 * MB => 6,        // 5-10MB: medium priority
-        ..=50 * MB => 4,        // 10-50MB: low priority
+        ..=MB5 => 8,            // 1-5MB: high priority
+        ..=MB10 => 6,           // 5-10MB: medium priority
+        ..=MB50 => 4,           // 10-50MB: low priority
         _ => 2,                 // > 50MB: lowest priority
     }
 }

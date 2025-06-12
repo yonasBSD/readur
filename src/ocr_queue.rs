@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgPool, Row};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tokio::time::{sleep, Duration};
@@ -37,6 +37,7 @@ pub struct QueueStats {
     pub oldest_pending_minutes: Option<f64>,
 }
 
+#[derive(Clone)]
 pub struct OcrQueueService {
     db: Database,
     pool: PgPool,
@@ -57,18 +58,20 @@ impl OcrQueueService {
 
     /// Add a document to the OCR queue
     pub async fn enqueue_document(&self, document_id: Uuid, priority: i32, file_size: i64) -> Result<Uuid> {
-        let id = sqlx::query_scalar!(
+        let row = sqlx::query(
             r#"
             INSERT INTO ocr_queue (document_id, priority, file_size)
             VALUES ($1, $2, $3)
             RETURNING id
-            "#,
-            document_id,
-            priority,
-            file_size
+            "#
         )
+        .bind(document_id)
+        .bind(priority)
+        .bind(file_size)
         .fetch_one(&self.pool)
         .await?;
+        
+        let id: Uuid = row.get("id");
 
         info!("Enqueued document {} with priority {} for OCR processing", document_id, priority);
         Ok(id)
@@ -82,19 +85,20 @@ impl OcrQueueService {
         let mut tx = self.pool.begin().await?;
         
         for (document_id, priority, file_size) in documents {
-            let id = sqlx::query_scalar!(
+            let row = sqlx::query(
                 r#"
                 INSERT INTO ocr_queue (document_id, priority, file_size)
                 VALUES ($1, $2, $3)
                 RETURNING id
-                "#,
-                document_id,
-                priority,
-                file_size
+                "#
             )
+            .bind(document_id)
+            .bind(priority)
+            .bind(file_size)
             .fetch_one(&mut *tx)
             .await?;
             
+            let id: Uuid = row.get("id");
             ids.push(id);
         }
         
@@ -106,8 +110,7 @@ impl OcrQueueService {
 
     /// Get the next item from the queue
     async fn dequeue(&self) -> Result<Option<OcrQueueItem>> {
-        let item = sqlx::query_as!(
-            OcrQueueItem,
+        let row = sqlx::query(
             r#"
             UPDATE ocr_queue
             SET status = 'processing',
@@ -124,28 +127,47 @@ impl OcrQueueService {
                 LIMIT 1
             )
             RETURNING *
-            "#,
-            &self.worker_id
+            "#
         )
+        .bind(&self.worker_id)
         .fetch_optional(&self.pool)
         .await?;
+
+        let item = match row {
+            Some(row) => Some(OcrQueueItem {
+                id: row.get("id"),
+                document_id: row.get("document_id"),
+                status: row.get("status"),
+                priority: row.get("priority"),
+                attempts: row.get("attempts"),
+                max_attempts: row.get("max_attempts"),
+                created_at: row.get("created_at"),
+                started_at: row.get("started_at"),
+                completed_at: row.get("completed_at"),
+                error_message: row.get("error_message"),
+                worker_id: row.get("worker_id"),
+                processing_time_ms: row.get("processing_time_ms"),
+                file_size: row.get("file_size"),
+            }),
+            None => None,
+        };
 
         Ok(item)
     }
 
     /// Mark an item as completed
     async fn mark_completed(&self, item_id: Uuid, processing_time_ms: i32) -> Result<()> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE ocr_queue
             SET status = 'completed',
                 completed_at = NOW(),
                 processing_time_ms = $2
             WHERE id = $1
-            "#,
-            item_id,
-            processing_time_ms
+            "#
         )
+        .bind(item_id)
+        .bind(processing_time_ms)
         .execute(&self.pool)
         .await?;
 
@@ -154,7 +176,7 @@ impl OcrQueueService {
 
     /// Mark an item as failed
     async fn mark_failed(&self, item_id: Uuid, error: &str) -> Result<()> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             UPDATE ocr_queue
             SET status = CASE 
@@ -166,14 +188,15 @@ impl OcrQueueService {
                 worker_id = NULL
             WHERE id = $1
             RETURNING status
-            "#,
-            item_id,
-            error
+            "#
         )
+        .bind(item_id)
+        .bind(error)
         .fetch_one(&self.pool)
         .await?;
 
-        if result.status == Some("failed".to_string()) {
+        let status: Option<String> = result.get("status");
+        if status == Some("failed".to_string()) {
             error!("OCR job {} permanently failed after max attempts: {}", item_id, error);
         }
 
@@ -187,21 +210,24 @@ impl OcrQueueService {
         info!("Processing OCR job {} for document {}", item.id, item.document_id);
         
         // Get document details
-        let document = sqlx::query!(
+        let document = sqlx::query(
             r#"
             SELECT file_path, mime_type, user_id
             FROM documents
             WHERE id = $1
-            "#,
-            item.document_id
+            "#
         )
+        .bind(item.document_id)
         .fetch_optional(&self.pool)
         .await?;
 
         match document {
-            Some(doc) => {
+            Some(row) => {
+                let file_path: String = row.get("file_path");
+                let mime_type: String = row.get("mime_type");
+                let user_id: Option<Uuid> = row.get("user_id");
                 // Get user's OCR settings
-                let settings = if let Some(user_id) = doc.user_id {
+                let settings = if let Some(user_id) = user_id {
                     self.db.get_user_settings(user_id).await.ok().flatten()
                 } else {
                     None
@@ -213,11 +239,11 @@ impl OcrQueueService {
                     .unwrap_or_else(|| "eng".to_string());
 
                 // Perform OCR
-                match ocr_service.extract_text_with_lang(&doc.file_path, &doc.mime_type, &ocr_language).await {
+                match ocr_service.extract_text_with_lang(&file_path, &mime_type, &ocr_language).await {
                     Ok(text) => {
                         if !text.is_empty() {
                             // Update document with OCR text
-                            sqlx::query!(
+                            sqlx::query(
                                 r#"
                                 UPDATE documents
                                 SET ocr_text = $2,
@@ -225,10 +251,10 @@ impl OcrQueueService {
                                     ocr_completed_at = NOW(),
                                     updated_at = NOW()
                                 WHERE id = $1
-                                "#,
-                                item.document_id,
-                                text
+                                "#
                             )
+                            .bind(item.document_id)
+                            .bind(text)
                             .execute(&self.pool)
                             .await?;
                         }
@@ -246,17 +272,17 @@ impl OcrQueueService {
                         warn!("{}", error_msg);
                         
                         // Update document status
-                        sqlx::query!(
+                        sqlx::query(
                             r#"
                             UPDATE documents
                             SET ocr_status = 'failed',
                                 ocr_error = $2,
                                 updated_at = NOW()
                             WHERE id = $1
-                            "#,
-                            item.document_id,
-                            &error_msg
+                            "#
                         )
+                        .bind(item.document_id)
+                        .bind(&error_msg)
                         .execute(&self.pool)
                         .await?;
                         
@@ -313,7 +339,7 @@ impl OcrQueueService {
 
     /// Get queue statistics
     pub async fn get_stats(&self) -> Result<QueueStats> {
-        let stats = sqlx::query!(
+        let stats = sqlx::query(
             r#"
             SELECT * FROM get_ocr_queue_stats()
             "#
@@ -322,18 +348,18 @@ impl OcrQueueService {
         .await?;
 
         Ok(QueueStats {
-            pending_count: stats.pending_count.unwrap_or(0),
-            processing_count: stats.processing_count.unwrap_or(0),
-            failed_count: stats.failed_count.unwrap_or(0),
-            completed_today: stats.completed_today.unwrap_or(0),
-            avg_wait_time_minutes: stats.avg_wait_time_minutes,
-            oldest_pending_minutes: stats.oldest_pending_minutes,
+            pending_count: stats.get::<Option<i64>, _>("pending_count").unwrap_or(0),
+            processing_count: stats.get::<Option<i64>, _>("processing_count").unwrap_or(0),
+            failed_count: stats.get::<Option<i64>, _>("failed_count").unwrap_or(0),
+            completed_today: stats.get::<Option<i64>, _>("completed_today").unwrap_or(0),
+            avg_wait_time_minutes: stats.get("avg_wait_time_minutes"),
+            oldest_pending_minutes: stats.get("oldest_pending_minutes"),
         })
     }
 
     /// Requeue failed items
     pub async fn requeue_failed_items(&self) -> Result<i64> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             UPDATE ocr_queue
             SET status = 'pending',
@@ -353,14 +379,14 @@ impl OcrQueueService {
 
     /// Clean up old completed items
     pub async fn cleanup_completed(&self, days_to_keep: i32) -> Result<i64> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             DELETE FROM ocr_queue
             WHERE status = 'completed'
               AND completed_at < NOW() - INTERVAL '1 day' * $1
-            "#,
-            days_to_keep
+            "#
         )
+        .bind(days_to_keep)
         .execute(&self.pool)
         .await?;
 
@@ -369,7 +395,7 @@ impl OcrQueueService {
 
     /// Handle stale processing items (worker crashed)
     pub async fn recover_stale_items(&self, stale_minutes: i32) -> Result<i64> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             UPDATE ocr_queue
             SET status = 'pending',
@@ -377,9 +403,9 @@ impl OcrQueueService {
                 worker_id = NULL
             WHERE status = 'processing'
               AND started_at < NOW() - INTERVAL '1 minute' * $1
-            "#,
-            stale_minutes
+            "#
         )
+        .bind(stale_minutes)
         .execute(&self.pool)
         .await?;
 

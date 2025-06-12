@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 RUN cargo build --release
 
@@ -43,6 +43,9 @@ COPY --from=backend-builder /app/target/release/readur /app/readur
 
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/watch /app/frontend
+
+# Set permissions for watch folder to handle various mount scenarios
+RUN chmod 755 /app/watch
 
 # Copy built frontend from frontend-builder
 COPY --from=frontend-builder /frontend/dist /app/frontend

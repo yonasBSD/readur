@@ -9,6 +9,9 @@ pub struct Config {
     pub upload_path: String,
     pub watch_folder: String,
     pub allowed_file_types: Vec<String>,
+    pub watch_interval_seconds: Option<u64>,
+    pub file_stability_check_ms: Option<u64>,
+    pub max_file_age_hours: Option<u64>,
 }
 
 impl Config {
@@ -31,6 +34,15 @@ impl Config {
                 .split(',')
                 .map(|s| s.trim().to_lowercase())
                 .collect(),
+            watch_interval_seconds: env::var("WATCH_INTERVAL_SECONDS")
+                .ok()
+                .and_then(|s| s.parse().ok()),
+            file_stability_check_ms: env::var("FILE_STABILITY_CHECK_MS")
+                .ok()
+                .and_then(|s| s.parse().ok()),
+            max_file_age_hours: env::var("MAX_FILE_AGE_HOURS")
+                .ok()
+                .and_then(|s| s.parse().ok()),
         })
     }
 }

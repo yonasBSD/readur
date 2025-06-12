@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::models::Document;
 
+#[derive(Clone)]
 pub struct FileService {
     upload_path: String,
 }
