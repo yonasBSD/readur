@@ -7,13 +7,12 @@ use axum::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use tokio::spawn;
 
 use crate::{
     auth::AuthUser,
     file_service::FileService,
     models::DocumentResponse,
-    ocr::OcrService,
+    ocr_queue::OcrQueueService,
     AppState,
 };
 
@@ -92,21 +91,25 @@ async fn upload_document(
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             
             let document_id = saved_document.id;
-            let db_clone = state.db.clone();
-            let file_path_clone = file_path.clone();
-            let mime_type_clone = mime_type.clone();
-            let ocr_language = settings.ocr_language.clone();
             let enable_background_ocr = settings.enable_background_ocr;
             
             if enable_background_ocr {
-                spawn(async move {
-                    let ocr_service = OcrService::new();
-                    if let Ok(text) = ocr_service.extract_text_with_lang(&file_path_clone, &mime_type_clone, &ocr_language).await {
-                        if !text.is_empty() {
-                            let _ = db_clone.update_document_ocr(document_id, &text).await;
-                        }
-                    }
-                });
+                // Use connection pool from state to enqueue the document
+                let pool = sqlx::PgPool::connect(&state.config.database_url).await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let queue_service = OcrQueueService::new(state.db.clone(), pool, 1);
+                
+                // Calculate priority based on file size
+                let priority = match file_size {
+                    0..=1048576 => 10,          // <= 1MB: highest priority
+                    ..=5242880 => 8,            // 1-5MB: high priority
+                    ..=10485760 => 6,           // 5-10MB: medium priority  
+                    ..=52428800 => 4,           // 10-50MB: low priority
+                    _ => 2,                     // > 50MB: lowest priority
+                };
+                
+                queue_service.enqueue_document(document_id, priority, file_size).await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             }
             
             return Ok(Json(saved_document.into()));

@@ -114,6 +114,12 @@ impl Database {
         )
         .execute(&self.pool)
         .await?;
+        
+        // Run OCR queue migration
+        let migration_sql = include_str!("../migrations/001_add_ocr_queue.sql");
+        sqlx::query(migration_sql)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }

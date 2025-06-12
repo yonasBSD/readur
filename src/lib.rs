@@ -1,0 +1,11 @@
+pub mod auth;
+pub mod batch_ingest;
+pub mod config;
+pub mod db;
+pub mod file_service;
+pub mod models;
+pub mod ocr;
+pub mod ocr_queue;
+pub mod routes;
+pub mod seed;
+pub mod watcher;
