@@ -1,0 +1,412 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Button,
+  Chip,
+  Stack,
+  Grid,
+  Divider,
+  IconButton,
+  Paper,
+  Alert,
+  CircularProgress,
+  Tooltip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogActions,
+} from '@mui/material';
+import {
+  ArrowBack as BackIcon,
+  Download as DownloadIcon,
+  PictureAsPdf as PdfIcon,
+  Image as ImageIcon,
+  Description as DocIcon,
+  TextSnippet as TextIcon,
+  CalendarToday as DateIcon,
+  Storage as SizeIcon,
+  Tag as TagIcon,
+  Visibility as ViewIcon,
+  Search as SearchIcon,
+  Edit as EditIcon,
+} from '@mui/icons-material';
+import { documentService } from '../services/api';
+
+const DocumentDetailsPage = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [document, setDocument] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [ocrText, setOcrText] = useState('');
+  const [showOcrDialog, setShowOcrDialog] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      fetchDocumentDetails();
+    }
+  }, [id]);
+
+  const fetchDocumentDetails = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Since we don't have a direct document details endpoint, 
+      // we'll fetch the document from the list and find the matching one
+      const response = await documentService.list(1000, 0);
+      const foundDoc = response.data.find(doc => doc.id === id);
+      
+      if (foundDoc) {
+        setDocument(foundDoc);
+        // If the document has OCR text, we could fetch it here
+        // For now, we'll show a placeholder
+        if (foundDoc.has_ocr_text) {
+          setOcrText('OCR text extraction feature would be available here. The document has been processed and text content is available for search.');
+        }
+      } else {
+        setError('Document not found');
+      }
+    } catch (err) {
+      setError('Failed to load document details');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      const response = await documentService.download(document.id);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', document.original_filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  };
+
+  const getFileIcon = (mimeType) => {
+    if (mimeType?.includes('pdf')) return <PdfIcon color="error" sx={{ fontSize: 64 }} />;
+    if (mimeType?.includes('image')) return <ImageIcon color="primary" sx={{ fontSize: 64 }} />;
+    if (mimeType?.includes('text')) return <TextIcon color="info" sx={{ fontSize: 64 }} />;
+    return <DocIcon color="secondary" sx={{ fontSize: 64 }} />;
+  };
+
+  const formatFileSize = (bytes) => {
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    if (bytes === 0) return '0 Bytes';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error || !document) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Button
+          startIcon={<BackIcon />}
+          onClick={() => navigate('/documents')}
+          sx={{ mb: 3 }}
+        >
+          Back to Documents
+        </Button>
+        <Alert severity="error">
+          {error || 'Document not found'}
+        </Alert>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ p: 3 }}>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Button
+          startIcon={<BackIcon />}
+          onClick={() => navigate('/documents')}
+          sx={{ mb: 2 }}
+        >
+          Back to Documents
+        </Button>
+        
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            fontWeight: 800,
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            color: 'transparent',
+            mb: 1,
+          }}
+        >
+          Document Details
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          View and manage document information
+        </Typography>
+      </Box>
+
+      <Grid container spacing={3}>
+        {/* Document Preview */}
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: 'fit-content' }}>
+            <CardContent sx={{ textAlign: 'center', py: 4 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 3,
+                  p: 3,
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                  borderRadius: 2,
+                }}
+              >
+                {getFileIcon(document.mime_type)}
+              </Box>
+              
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                {document.original_filename}
+              </Typography>
+              
+              <Stack direction="row" spacing={1} justifyContent="center" sx={{ mb: 3 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownload}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Download
+                </Button>
+                {document.has_ocr_text && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<SearchIcon />}
+                    onClick={() => setShowOcrDialog(true)}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    View OCR
+                  </Button>
+                )}
+              </Stack>
+              
+              {document.has_ocr_text && (
+                <Chip 
+                  label="OCR Processed" 
+                  color="success"
+                  variant="outlined"
+                  icon={<TextIcon />}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Document Information */}
+        <Grid item xs={12} md={8}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                Document Information
+              </Typography>
+
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6}>
+                  <Paper sx={{ p: 2, height: '100%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <DocIcon color="primary" sx={{ mr: 1 }} />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Filename
+                      </Typography>
+                    </Box>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {document.original_filename}
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Paper sx={{ p: 2, height: '100%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <SizeIcon color="primary" sx={{ mr: 1 }} />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        File Size
+                      </Typography>
+                    </Box>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {formatFileSize(document.file_size)}
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Paper sx={{ p: 2, height: '100%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <DateIcon color="primary" sx={{ mr: 1 }} />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Upload Date
+                      </Typography>
+                    </Box>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {formatDate(document.created_at)}
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Paper sx={{ p: 2, height: '100%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <ViewIcon color="primary" sx={{ mr: 1 }} />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        File Type
+                      </Typography>
+                    </Box>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {document.mime_type}
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                {document.tags && document.tags.length > 0 && (
+                  <Grid item xs={12}>
+                    <Paper sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <TagIcon color="primary" sx={{ mr: 1 }} />
+                        <Typography variant="subtitle2" color="text.secondary">
+                          Tags
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                        {document.tags.map((tag, index) => (
+                          <Chip 
+                            key={index}
+                            label={tag} 
+                            color="primary"
+                            variant="outlined"
+                          />
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Grid>
+                )}
+              </Grid>
+
+              <Divider sx={{ my: 3 }} />
+
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                Processing Status
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        backgroundColor: 'success.main',
+                        mr: 2,
+                      }}
+                    />
+                    <Typography variant="body2">
+                      Document uploaded successfully
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        backgroundColor: document.has_ocr_text ? 'success.main' : 'warning.main',
+                        mr: 2,
+                      }}
+                    />
+                    <Typography variant="body2">
+                      {document.has_ocr_text ? 'OCR processing completed' : 'OCR processing pending'}
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* OCR Text Dialog */}
+      <Dialog
+        open={showOcrDialog}
+        onClose={() => setShowOcrDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Extracted Text (OCR)
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Paper
+            sx={{
+              p: 2,
+              backgroundColor: 'grey.50',
+              border: '1px solid',
+              borderColor: 'grey.200',
+              maxHeight: 400,
+              overflow: 'auto',
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap',
+                color: ocrText ? 'text.primary' : 'text.secondary',
+              }}
+            >
+              {ocrText || 'OCR text extraction is not yet implemented in the frontend. The backend processes documents and stores extracted text for search functionality.'}
+            </Typography>
+          </Paper>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowOcrDialog(false)}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default DocumentDetailsPage;

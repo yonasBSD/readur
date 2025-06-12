@@ -10,6 +10,7 @@ import Dashboard from './components/Dashboard/Dashboard';
 import UploadPage from './pages/UploadPage';
 import DocumentsPage from './pages/DocumentsPage';
 import SearchPage from './pages/SearchPage';
+import DocumentDetailsPage from './pages/DocumentDetailsPage';
 
 function App() {
   const { user, loading } = useAuth();
@@ -59,6 +60,7 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/upload" element={<UploadPage />} />
                   <Route path="/documents" element={<DocumentsPage />} />
+                  <Route path="/documents/:id" element={<DocumentDetailsPage />} />
                   <Route path="/search" element={<SearchPage />} />
                   <Route path="/watch" element={<div>Watch Folder Page - Coming Soon</div>} />
                   <Route path="/settings" element={<div>Settings Page - Coming Soon</div>} />

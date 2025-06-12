@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -41,6 +42,7 @@ import {
 import { documentService } from '../services/api';
 
 const DocumentsPage = () => {
+  const navigate = useNavigate();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -263,7 +265,10 @@ const DocumentsPage = () => {
           <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Download</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => setDocMenuAnchor(null)}>
+        <MenuItem onClick={() => { 
+          navigate(`/documents/${selectedDoc.id}`); 
+          setDocMenuAnchor(null); 
+        }}>
           <ListItemIcon><ViewIcon fontSize="small" /></ListItemIcon>
           <ListItemText>View Details</ListItemText>
         </MenuItem>

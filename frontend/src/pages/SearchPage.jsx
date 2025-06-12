@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -48,6 +49,7 @@ import {
 import { documentService } from '../services/api';
 
 const SearchPage = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -609,6 +611,14 @@ const SearchPage = () => {
                           )}
                         </Box>
                         
+                        <Tooltip title="View Details">
+                          <IconButton
+                            size="small"
+                            onClick={() => navigate(`/documents/${doc.id}`)}
+                          >
+                            <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Download">
                           <IconButton
                             size="small"
