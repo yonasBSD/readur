@@ -12,6 +12,16 @@ pub struct Config {
     pub watch_interval_seconds: Option<u64>,
     pub file_stability_check_ms: Option<u64>,
     pub max_file_age_hours: Option<u64>,
+    
+    // OCR Configuration
+    pub ocr_language: String,
+    pub concurrent_ocr_jobs: usize,
+    pub ocr_timeout_seconds: u64,
+    pub max_file_size_mb: u64,
+    
+    // Performance
+    pub memory_limit_mb: usize,
+    pub cpu_priority: String,
 }
 
 impl Config {
@@ -43,6 +53,30 @@ impl Config {
             max_file_age_hours: env::var("MAX_FILE_AGE_HOURS")
                 .ok()
                 .and_then(|s| s.parse().ok()),
+                
+            // OCR Configuration
+            ocr_language: env::var("OCR_LANGUAGE")
+                .unwrap_or_else(|_| "eng".to_string()),
+            concurrent_ocr_jobs: env::var("CONCURRENT_OCR_JOBS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(4),
+            ocr_timeout_seconds: env::var("OCR_TIMEOUT_SECONDS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(300),
+            max_file_size_mb: env::var("MAX_FILE_SIZE_MB")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(50),
+                
+            // Performance
+            memory_limit_mb: env::var("MEMORY_LIMIT_MB")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(512),
+            cpu_priority: env::var("CPU_PRIORITY")
+                .unwrap_or_else(|_| "normal".to_string()),
         })
     }
 }
