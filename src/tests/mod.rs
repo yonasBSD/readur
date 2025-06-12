@@ -1,4 +1,7 @@
+mod helpers;
 mod auth_tests;
 mod db_tests;
 mod file_service_tests;
 mod ocr_tests;
+mod settings_tests;
+mod users_tests;

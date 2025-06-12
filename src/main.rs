@@ -1,8 +1,7 @@
 use axum::{
-    extract::State,
     http::StatusCode,
     response::Json,
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use std::sync::Arc;
@@ -50,6 +49,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api/auth", routes::auth::router())
         .nest("/api/documents", routes::documents::router())
         .nest("/api/search", routes::search::router())
+        .nest("/api/settings", routes::settings::router())
+        .nest("/api/users", routes::users::router())
         .nest_service("/", ServeDir::new("/app/frontend"))
         .layer(CorsLayer::permissive())
         .with_state(Arc::new(state));

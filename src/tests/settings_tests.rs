@@ -1,0 +1,173 @@
+#[cfg(test)]
+mod tests {
+    use crate::models::UpdateSettings;
+    use super::super::helpers::{create_test_app, create_test_user, login_user};
+    use axum::http::StatusCode;
+    use serde_json::json;
+    use tower::util::ServiceExt;
+
+    #[tokio::test]
+    async fn test_get_settings_default() {
+        let (app, _container) = create_test_app().await;
+        let user = create_test_user(&app).await;
+        let token = login_user(&app, &user.username, "password123").await;
+
+        let response = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("GET")
+                    .uri("/api/settings")
+                    .header("Authorization", format!("Bearer {}", token))
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let settings: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(settings["ocr_language"], "eng");
+    }
+
+    #[tokio::test]
+    async fn test_update_settings() {
+        let (app, _container) = create_test_app().await;
+        let user = create_test_user(&app).await;
+        let token = login_user(&app, &user.username, "password123").await;
+
+        let update_data = UpdateSettings {
+            ocr_language: "spa".to_string(),
+        };
+
+        let response = app
+            .clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("PUT")
+                    .uri("/api/settings")
+                    .header("Authorization", format!("Bearer {}", token))
+                    .header("Content-Type", "application/json")
+                    .body(axum::body::Body::from(serde_json::to_vec(&update_data).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Verify the update
+        let response = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("GET")
+                    .uri("/api/settings")
+                    .header("Authorization", format!("Bearer {}", token))
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let settings: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(settings["ocr_language"], "spa");
+    }
+
+    #[tokio::test]
+    async fn test_settings_isolated_per_user() {
+        let (app, _container) = create_test_app().await;
+        
+        // Create two users
+        let user1 = create_test_user(&app).await;
+        let token1 = login_user(&app, &user1.username, "password123").await;
+        
+        let user2_data = json!({
+            "username": "testuser2",
+            "email": "test2@example.com",
+            "password": "password456"
+        });
+        
+        let response = app
+            .clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/register")
+                    .header("Content-Type", "application/json")
+                    .body(axum::body::Body::from(serde_json::to_vec(&user2_data).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        
+        assert_eq!(response.status(), StatusCode::OK);
+        let token2 = login_user(&app, "testuser2", "password456").await;
+
+        // Update user1's settings
+        let update_data = UpdateSettings {
+            ocr_language: "fra".to_string(),
+        };
+
+        let response = app
+            .clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("PUT")
+                    .uri("/api/settings")
+                    .header("Authorization", format!("Bearer {}", token1))
+                    .header("Content-Type", "application/json")
+                    .body(axum::body::Body::from(serde_json::to_vec(&update_data).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Check user2's settings are still default
+        let response = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("GET")
+                    .uri("/api/settings")
+                    .header("Authorization", format!("Bearer {}", token2))
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let settings: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(settings["ocr_language"], "eng");
+    }
+
+    #[tokio::test]
+    async fn test_settings_requires_auth() {
+        let (app, _container) = create_test_app().await;
+
+        let response = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("GET")
+                    .uri("/api/settings")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+}

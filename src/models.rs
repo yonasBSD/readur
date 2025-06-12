@@ -106,3 +106,37 @@ impl From<User> for UserResponse {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateUser {
+    pub username: Option<String>,
+    pub email: Option<String>,
+    pub password: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Settings {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub ocr_language: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SettingsResponse {
+    pub ocr_language: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateSettings {
+    pub ocr_language: String,
+}
+
+impl From<Settings> for SettingsResponse {
+    fn from(settings: Settings) -> Self {
+        Self {
+            ocr_language: settings.ocr_language,
+        }
+    }
+}

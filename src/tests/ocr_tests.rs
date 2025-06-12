@@ -4,6 +4,45 @@ mod tests {
     use std::fs;
     use std::path::Path;
     use tempfile::NamedTempFile;
+    
+    // Mock database for testing
+    mod mock_db {
+        use anyhow::Result;
+        use uuid::Uuid;
+        use std::sync::{Arc, Mutex};
+        use std::collections::HashMap;
+        
+        #[derive(Clone)]
+        pub struct MockDatabase {
+            ocr_updates: Arc<Mutex<HashMap<Uuid, String>>>,
+        }
+        
+        impl MockDatabase {
+            pub fn new() -> Self {
+                Self {
+                    ocr_updates: Arc::new(Mutex::new(HashMap::new())),
+                }
+            }
+            
+            pub async fn update_document_ocr(&self, id: Uuid, ocr_text: &str) -> Result<()> {
+                let mut updates = self.ocr_updates.lock().unwrap();
+                updates.insert(id, ocr_text.to_string());
+                Ok(())
+            }
+            
+            pub fn get_ocr_text(&self, id: &Uuid) -> Option<String> {
+                let updates = self.ocr_updates.lock().unwrap();
+                updates.get(id).cloned()
+            }
+            
+            pub fn get_all_ocr_updates(&self) -> HashMap<Uuid, String> {
+                let updates = self.ocr_updates.lock().unwrap();
+                updates.clone()
+            }
+        }
+    }
+    
+    use mock_db::MockDatabase;
 
     #[test]
     fn test_is_image_file() {
@@ -172,5 +211,186 @@ startxref
         
         // This should try to process as image due to extension, but fail due to invalid data
         assert!(result.is_err());
+    }
+    
+    #[tokio::test]
+    async fn test_ocr_with_mock_database_integration() {
+        let ocr_service = OcrService::new();
+        let mock_db = MockDatabase::new();
+        let doc_id = uuid::Uuid::new_v4();
+        
+        // Create a simple text file to simulate OCR processing
+        let temp_file = NamedTempFile::with_suffix(".txt").unwrap();
+        let test_content = "This is test OCR content for mock database integration.";
+        fs::write(temp_file.path(), test_content).unwrap();
+        
+        // Extract text using OCR service
+        let result = ocr_service
+            .extract_text(temp_file.path().to_str().unwrap(), "text/plain")
+            .await;
+        
+        assert!(result.is_ok());
+        let extracted_text = result.unwrap();
+        
+        // Mock database update
+        let update_result = mock_db.update_document_ocr(doc_id, &extracted_text).await;
+        assert!(update_result.is_ok());
+        
+        // Verify the text was stored in mock database
+        let stored_text = mock_db.get_ocr_text(&doc_id);
+        assert!(stored_text.is_some());
+        assert_eq!(stored_text.unwrap(), test_content);
+    }
+    
+    #[tokio::test]
+    async fn test_ocr_error_handling_with_mock_db() {
+        let ocr_service = OcrService::new();
+        let mock_db = MockDatabase::new();
+        let doc_id = uuid::Uuid::new_v4();
+        
+        // Test with non-existent file
+        let result = ocr_service
+            .extract_text("/nonexistent/path/file.txt", "text/plain")
+            .await;
+        
+        assert!(result.is_err());
+        
+        // Verify no update was made to mock database for failed OCR
+        let stored_text = mock_db.get_ocr_text(&doc_id);
+        assert!(stored_text.is_none());
+    }
+    
+    #[tokio::test]
+    async fn test_batch_ocr_processing_with_mock_db() {
+        let ocr_service = OcrService::new();
+        let mock_db = MockDatabase::new();
+        
+        let mut doc_ids = Vec::new();
+        let mut temp_files = Vec::new();
+        
+        // Create multiple test files
+        for i in 0..3 {
+            let temp_file = NamedTempFile::with_suffix(".txt").unwrap();
+            let content = format!("Test document {} content for batch processing.", i + 1);
+            fs::write(temp_file.path(), &content).unwrap();
+            
+            let doc_id = uuid::Uuid::new_v4();
+            doc_ids.push(doc_id);
+            temp_files.push((temp_file, content));
+        }
+        
+        // Process all files
+        for (i, (temp_file, _expected_content)) in temp_files.iter().enumerate() {
+            let result = ocr_service
+                .extract_text(temp_file.path().to_str().unwrap(), "text/plain")
+                .await;
+            
+            assert!(result.is_ok());
+            let extracted_text = result.unwrap();
+            
+            let update_result = mock_db.update_document_ocr(doc_ids[i], &extracted_text).await;
+            assert!(update_result.is_ok());
+        }
+        
+        // Verify all documents were processed
+        let all_updates = mock_db.get_all_ocr_updates();
+        assert_eq!(all_updates.len(), 3);
+        
+        for (i, doc_id) in doc_ids.iter().enumerate() {
+            let stored_text = all_updates.get(doc_id);
+            assert!(stored_text.is_some());
+            assert!(stored_text.unwrap().contains(&format!("Test document {}", i + 1)));
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_ocr_language_support() {
+        let ocr_service = OcrService::new();
+        
+        let temp_file = NamedTempFile::with_suffix(".txt").unwrap();
+        let test_content = "Hello world test content";
+        fs::write(temp_file.path(), test_content).unwrap();
+        
+        // Test different language codes
+        let languages = vec!["eng", "spa", "fra", "deu"];
+        
+        for lang in languages {
+            let result = ocr_service
+                .extract_text_with_lang(temp_file.path().to_str().unwrap(), "text/plain", lang)
+                .await;
+            
+            // Should succeed for text files regardless of language setting
+            assert!(result.is_ok());
+            let extracted = result.unwrap();
+            assert_eq!(extracted, test_content);
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_ocr_mime_type_detection() {
+        let ocr_service = OcrService::new();
+        
+        // Test various mime types
+        let test_cases = vec![
+            ("test.txt", "text/plain"),
+            ("document.pdf", "application/pdf"),
+            ("image.png", "image/png"),
+            ("photo.jpg", "image/jpeg"),
+            ("scan.tiff", "image/tiff"),
+        ];
+        
+        for (filename, mime_type) in test_cases {
+            let temp_file = NamedTempFile::with_suffix(&Path::new(filename).extension().unwrap().to_str().unwrap()).unwrap();
+            
+            if mime_type == "text/plain" {
+                fs::write(temp_file.path(), "test content").unwrap();
+                
+                let result = ocr_service
+                    .extract_text(temp_file.path().to_str().unwrap(), mime_type)
+                    .await;
+                
+                assert!(result.is_ok(), "Failed for mime type: {}", mime_type);
+            } else {
+                // For non-text files, we expect either success or specific errors
+                let result = ocr_service
+                    .extract_text(temp_file.path().to_str().unwrap(), mime_type)
+                    .await;
+                
+                // These will likely fail with our test setup, but should not panic
+                if result.is_err() {
+                    println!("Expected failure for {}: {}", mime_type, result.unwrap_err());
+                }
+            }
+        }
+    }
+    
+    #[test]
+    fn test_mock_database_functionality() {
+        let mock_db = MockDatabase::new();
+        let doc_id1 = uuid::Uuid::new_v4();
+        let doc_id2 = uuid::Uuid::new_v4();
+        
+        // Test empty state
+        assert!(mock_db.get_ocr_text(&doc_id1).is_none());
+        
+        // Test single update
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let result = mock_db.update_document_ocr(doc_id1, "Test OCR text").await;
+            assert!(result.is_ok());
+        });
+        
+        assert_eq!(mock_db.get_ocr_text(&doc_id1).unwrap(), "Test OCR text");
+        
+        // Test multiple updates
+        rt.block_on(async {
+            let result = mock_db.update_document_ocr(doc_id2, "Another OCR text").await;
+            assert!(result.is_ok());
+        });
+        
+        let all_updates = mock_db.get_all_ocr_updates();
+        assert_eq!(all_updates.len(), 2);
+        assert!(all_updates.contains_key(&doc_id1));
+        assert!(all_updates.contains_key(&doc_id2));
     }
 }

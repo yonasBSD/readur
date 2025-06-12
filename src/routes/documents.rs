@@ -12,7 +12,7 @@ use tokio::spawn;
 use crate::{
     auth::AuthUser,
     file_service::FileService,
-    models::{DocumentResponse, SearchRequest, SearchResponse},
+    models::DocumentResponse,
     ocr::OcrService,
     AppState,
 };

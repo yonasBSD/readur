@@ -1,10 +1,9 @@
 use anyhow::Result;
 use axum::{
     async_trait,
-    extract::{FromRequestParts, State},
+    extract::FromRequestParts,
     http::{request::Parts, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    Json,
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};

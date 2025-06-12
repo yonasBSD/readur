@@ -84,6 +84,21 @@ impl Database {
         sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_documents_content_search ON documents USING GIN(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')))"#)
             .execute(&self.pool)
             .await?;
+        
+        // Create settings table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS settings (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+                ocr_language VARCHAR(10) DEFAULT 'eng',
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
@@ -321,5 +336,115 @@ impl Database {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn get_all_users(&self) -> Result<Vec<User>> {
+        let rows = sqlx::query(
+            "SELECT id, username, email, password_hash, created_at, updated_at FROM users ORDER BY created_at DESC"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let users = rows
+            .into_iter()
+            .map(|row| User {
+                id: row.get("id"),
+                username: row.get("username"),
+                email: row.get("email"),
+                password_hash: row.get("password_hash"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+            })
+            .collect();
+
+        Ok(users)
+    }
+
+    pub async fn update_user(&self, id: Uuid, username: Option<String>, email: Option<String>, password: Option<String>) -> Result<User> {
+        let user = self.get_user_by_id(id).await?.ok_or_else(|| anyhow::anyhow!("User not found"))?;
+        
+        let username = username.unwrap_or(user.username);
+        let email = email.unwrap_or(user.email);
+        let password_hash = if let Some(pwd) = password {
+            bcrypt::hash(&pwd, 12)?
+        } else {
+            user.password_hash
+        };
+
+        let row = sqlx::query(
+            r#"
+            UPDATE users SET username = $1, email = $2, password_hash = $3, updated_at = NOW()
+            WHERE id = $4
+            RETURNING id, username, email, password_hash, created_at, updated_at
+            "#
+        )
+        .bind(&username)
+        .bind(&email)
+        .bind(&password_hash)
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(User {
+            id: row.get("id"),
+            username: row.get("username"),
+            email: row.get("email"),
+            password_hash: row.get("password_hash"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+    }
+
+    pub async fn delete_user(&self, id: Uuid) -> Result<()> {
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_user_settings(&self, user_id: Uuid) -> Result<Option<crate::models::Settings>> {
+        let row = sqlx::query(
+            "SELECT id, user_id, ocr_language, created_at, updated_at FROM settings WHERE user_id = $1"
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => Ok(Some(crate::models::Settings {
+                id: row.get("id"),
+                user_id: row.get("user_id"),
+                ocr_language: row.get("ocr_language"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+            })),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn create_or_update_settings(&self, user_id: Uuid, ocr_language: &str) -> Result<crate::models::Settings> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO settings (user_id, ocr_language)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id) DO UPDATE
+            SET ocr_language = $2, updated_at = NOW()
+            RETURNING id, user_id, ocr_language, created_at, updated_at
+            "#
+        )
+        .bind(user_id)
+        .bind(ocr_language)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(crate::models::Settings {
+            id: row.get("id"),
+            user_id: row.get("user_id"),
+            ocr_language: row.get("ocr_language"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
     }
 }

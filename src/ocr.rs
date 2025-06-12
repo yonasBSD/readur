@@ -10,7 +10,11 @@ impl OcrService {
     }
 
     pub async fn extract_text_from_image(&self, file_path: &str) -> Result<String> {
-        let mut tesseract = Tesseract::new(None, Some("eng"))?
+        self.extract_text_from_image_with_lang(file_path, "eng").await
+    }
+
+    pub async fn extract_text_from_image_with_lang(&self, file_path: &str, lang: &str) -> Result<String> {
+        let mut tesseract = Tesseract::new(None, Some(lang))?
             .set_image(file_path)?;
         
         let text = tesseract.get_text()?;
@@ -27,10 +31,14 @@ impl OcrService {
     }
 
     pub async fn extract_text(&self, file_path: &str, mime_type: &str) -> Result<String> {
+        self.extract_text_with_lang(file_path, mime_type, "eng").await
+    }
+
+    pub async fn extract_text_with_lang(&self, file_path: &str, mime_type: &str, lang: &str) -> Result<String> {
         match mime_type {
             "application/pdf" => self.extract_text_from_pdf(file_path).await,
             "image/png" | "image/jpeg" | "image/jpg" | "image/tiff" | "image/bmp" => {
-                self.extract_text_from_image(file_path).await
+                self.extract_text_from_image_with_lang(file_path, lang).await
             }
             "text/plain" => {
                 let text = tokio::fs::read_to_string(file_path).await?;
@@ -38,7 +46,7 @@ impl OcrService {
             }
             _ => {
                 if self.is_image_file(file_path) {
-                    self.extract_text_from_image(file_path).await
+                    self.extract_text_from_image_with_lang(file_path, lang).await
                 } else {
                     Err(anyhow!("Unsupported file type for OCR: {}", mime_type))
                 }

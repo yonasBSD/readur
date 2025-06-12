@@ -45,6 +45,7 @@ import {
   CalendarToday as DateIcon,
   Storage as SizeIcon,
   Tag as TagIcon,
+  Visibility as ViewIcon,
 } from '@mui/icons-material';
 import { documentService } from '../services/api';
 
