@@ -29,6 +29,12 @@ import {
   Divider,
   IconButton,
   Tooltip,
+  Autocomplete,
+  LinearProgress,
+  FormControlLabel,
+  Switch,
+  Paper,
+  Skeleton,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -46,6 +52,10 @@ import {
   Storage as SizeIcon,
   Tag as TagIcon,
   Visibility as ViewIcon,
+  Settings as SettingsIcon,
+  Speed as SpeedIcon,
+  AccessTime as TimeIcon,
+  TrendingUp as TrendingIcon,
 } from '@mui/icons-material';
 import { documentService } from '../services/api';
 
@@ -56,6 +66,16 @@ const SearchPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
+  const [queryTime, setQueryTime] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
+  const [suggestions, setSuggestions] = useState([]);
+  
+  // Search settings
+  const [useEnhancedSearch, setUseEnhancedSearch] = useState(true);
+  const [searchMode, setSearchMode] = useState('simple');
+  const [includeSnippets, setIncludeSnippets] = useState(true);
+  const [snippetLength, setSnippetLength] = useState(200);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   
   // Filter states
   const [selectedTags, setSelectedTags] = useState([]);
@@ -86,6 +106,9 @@ const SearchPage = () => {
   const performSearch = useCallback(async (query, filters = {}) => {
     if (!query.trim()) {
       setSearchResults([]);
+      setTotalResults(0);
+      setQueryTime(0);
+      setSuggestions([]);
       return;
     }
 
@@ -99,9 +122,14 @@ const SearchPage = () => {
         mime_types: filters.mimeTypes?.length ? filters.mimeTypes : undefined,
         limit: 100,
         offset: 0,
+        include_snippets: includeSnippets,
+        snippet_length: snippetLength,
+        search_mode: searchMode,
       };
 
-      const response = await documentService.search(searchRequest);
+      const response = useEnhancedSearch 
+        ? await documentService.enhancedSearch(searchRequest)
+        : await documentService.search(searchRequest);
       
       // Apply additional client-side filters
       let results = response.data.documents || [];
@@ -134,6 +162,9 @@ const SearchPage = () => {
       }
       
       setSearchResults(results);
+      setTotalResults(response.data.total || results.length);
+      setQueryTime(response.data.query_time_ms || 0);
+      setSuggestions(response.data.suggestions || []);
       
       // Extract unique tags for filter options
       const tags = [...new Set(results.flatMap(doc => doc.tags))];
@@ -145,7 +176,7 @@ const SearchPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [useEnhancedSearch, includeSnippets, snippetLength, searchMode]);
 
   const debouncedSearch = useCallback(
     debounce((query, filters) => performSearch(query, filters), 500),
@@ -209,9 +240,63 @@ const SearchPage = () => {
     }
   };
 
+  const renderHighlightedText = (text, highlightRanges) => {
+    if (!highlightRanges || highlightRanges.length === 0) {
+      return text;
+    }
+
+    const parts = [];
+    let lastIndex = 0;
+
+    highlightRanges.forEach((range, index) => {
+      // Add text before highlight
+      if (range.start > lastIndex) {
+        parts.push(
+          <span key={`text-${index}`}>
+            {text.substring(lastIndex, range.start)}
+          </span>
+        );
+      }
+      
+      // Add highlighted text
+      parts.push(
+        <Box
+          key={`highlight-${index}`}
+          component="mark"
+          sx={{
+            backgroundColor: 'primary.light',
+            color: 'primary.contrastText',
+            padding: '0 2px',
+            borderRadius: '2px',
+            fontWeight: 600,
+          }}
+        >
+          {text.substring(range.start, range.end)}
+        </Box>
+      );
+      
+      lastIndex = range.end;
+    });
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(
+        <span key="final-text">
+          {text.substring(lastIndex)}
+        </span>
+      );
+    }
+
+    return parts;
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setSearchQuery(suggestion);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
-      {/* Header */}
+      {/* Header with Prominent Search */}
       <Box sx={{ mb: 4 }}>
         <Typography 
           variant="h4" 
@@ -221,14 +306,218 @@ const SearchPage = () => {
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             color: 'transparent',
-            mb: 1,
+            mb: 2,
           }}
         >
           Search Documents
         </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Find documents using full-text search and advanced filters
-        </Typography>
+        
+        {/* Enhanced Search Bar */}
+        <Paper 
+          elevation={3}
+          sx={{
+            p: 2,
+            mb: 3,
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+            border: '1px solid',
+            borderColor: 'primary.light',
+          }}
+        >
+          <Box sx={{ position: 'relative' }}>
+            <TextField
+              fullWidth
+              placeholder="Search documents by content, filename, or tags... Try 'invoice', 'contract', or tag:important"
+              variant="outlined"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="primary" sx={{ fontSize: '1.5rem' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Stack direction="row" spacing={1}>
+                      {loading && <CircularProgress size={20} />}
+                      {searchQuery && (
+                        <IconButton
+                          size="small"
+                          onClick={() => setSearchQuery('')}
+                        >
+                          <ClearIcon />
+                        </IconButton>
+                      )}
+                      <IconButton
+                        size="small"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        color={showAdvanced ? 'primary' : 'default'}
+                      >
+                        <SettingsIcon />
+                      </IconButton>
+                    </Stack>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderWidth: 2,
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'primary.main',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: 'primary.main',
+                  },
+                },
+                '& .MuiInputBase-input': {
+                  fontSize: '1.1rem',
+                  py: 2,
+                },
+              }}
+            />
+            
+            {/* Loading Progress Bar */}
+            {loading && (
+              <LinearProgress 
+                sx={{ 
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  borderRadius: '0 0 4px 4px',
+                }}
+              />
+            )}
+          </Box>
+
+          {/* Quick Stats */}
+          {(searchQuery && !loading) && (
+            <Box sx={{ 
+              mt: 2, 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 2,
+            }}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Chip 
+                  icon={<TrendingIcon />}
+                  label={`${totalResults} results`} 
+                  size="small" 
+                  color="primary"
+                  variant="outlined"
+                />
+                <Chip 
+                  icon={<TimeIcon />}
+                  label={`${queryTime}ms`} 
+                  size="small" 
+                  variant="outlined"
+                />
+                {useEnhancedSearch && (
+                  <Chip 
+                    icon={<SpeedIcon />}
+                    label="Enhanced" 
+                    size="small" 
+                    color="success"
+                    variant="outlined"
+                  />
+                )}
+              </Stack>
+              
+              {/* Search Mode Selector */}
+              <ToggleButtonGroup
+                value={searchMode}
+                exclusive
+                onChange={(e, newMode) => newMode && setSearchMode(newMode)}
+                size="small"
+              >
+                <ToggleButton value="simple">Simple</ToggleButton>
+                <ToggleButton value="phrase">Phrase</ToggleButton>
+                <ToggleButton value="fuzzy">Fuzzy</ToggleButton>
+                <ToggleButton value="boolean">Boolean</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+          )}
+
+          {/* Suggestions */}
+          {suggestions.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Suggestions:
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {suggestions.map((suggestion, index) => (
+                  <Chip
+                    key={index}
+                    label={suggestion}
+                    size="small"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    clickable
+                    variant="outlined"
+                    sx={{ 
+                      '&:hover': { 
+                        backgroundColor: 'primary.light',
+                        color: 'primary.contrastText',
+                      }
+                    }}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Advanced Search Options */}
+          {showAdvanced && (
+            <Box sx={{ mt: 3, pt: 2, borderTop: '1px dashed', borderColor: 'divider' }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Search Options
+              </Typography>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={useEnhancedSearch}
+                        onChange={(e) => setUseEnhancedSearch(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Enhanced Search"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={includeSnippets}
+                        onChange={(e) => setIncludeSnippets(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Show Snippets"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Snippet Length</InputLabel>
+                    <Select
+                      value={snippetLength}
+                      onChange={(e) => setSnippetLength(e.target.value)}
+                      label="Snippet Length"
+                    >
+                      <MenuItem value={100}>Short (100)</MenuItem>
+                      <MenuItem value={200}>Medium (200)</MenuItem>
+                      <MenuItem value={400}>Long (400)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </Paper>
       </Box>
 
       <Grid container spacing={3}>
@@ -391,66 +680,34 @@ const SearchPage = () => {
 
         {/* Search Results */}
         <Grid item xs={12} md={9}>
-          {/* Search Bar */}
-          <Box sx={{ mb: 3 }}>
-            <TextField
-              fullWidth
-              placeholder="Search documents by filename, content, or tags..."
-              variant="outlined"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="action" />
-                  </InputAdornment>
-                ),
-                endAdornment: searchQuery && (
-                  <InputAdornment position="end">
-                    <IconButton
-                      size="small"
-                      onClick={() => setSearchQuery('')}
-                    >
-                      <ClearIcon />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  '& fieldset': {
-                    borderWidth: 2,
-                  },
-                },
-              }}
-            />
-          </Box>
 
           {/* Toolbar */}
-          <Box sx={{ 
-            mb: 3, 
-            display: 'flex', 
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <Typography variant="body2" color="text.secondary">
-              {loading ? 'Searching...' : `${searchResults.length} results found`}
-            </Typography>
-            
-            <ToggleButtonGroup
-              value={viewMode}
-              exclusive
-              onChange={(e, newView) => newView && setViewMode(newView)}
-              size="small"
-            >
-              <ToggleButton value="grid">
-                <GridViewIcon />
-              </ToggleButton>
-              <ToggleButton value="list">
-                <ListViewIcon />
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
+          {searchQuery && (
+            <Box sx={{ 
+              mb: 3, 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <Typography variant="body2" color="text.secondary">
+                {loading ? 'Searching...' : `${searchResults.length} results found`}
+              </Typography>
+              
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={(e, newView) => newView && setViewMode(newView)}
+                size="small"
+              >
+                <ToggleButton value="grid">
+                  <GridViewIcon />
+                </ToggleButton>
+                <ToggleButton value="list">
+                  <ListViewIcon />
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+          )}
 
           {/* Results */}
           {loading && (
@@ -496,11 +753,16 @@ const SearchPage = () => {
             >
               <SearchIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                Start searching
+                Start searching your documents
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Enter keywords to search through your documents
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Use the enhanced search bar above to find documents by content, filename, or tags
               </Typography>
+              <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
+                <Chip label="Try: invoice" size="small" variant="outlined" />
+                <Chip label="Try: contract" size="small" variant="outlined" />
+                <Chip label="Try: tag:important" size="small" variant="outlined" />
+              </Stack>
             </Box>
           )}
 
@@ -609,6 +871,54 @@ const SearchPage = () => {
                                 />
                               )}
                             </Stack>
+                          )}
+
+                          {/* Search Snippets */}
+                          {doc.snippets && doc.snippets.length > 0 && (
+                            <Box sx={{ mt: 2, mb: 1 }}>
+                              {doc.snippets.slice(0, 2).map((snippet, index) => (
+                                <Paper
+                                  key={index}
+                                  variant="outlined"
+                                  sx={{
+                                    p: 1.5,
+                                    mb: 1,
+                                    backgroundColor: 'grey.50',
+                                    borderLeft: '3px solid',
+                                    borderLeftColor: 'primary.main',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontSize: '0.8rem',
+                                      lineHeight: 1.4,
+                                      color: 'text.primary',
+                                    }}
+                                  >
+                                    ...{renderHighlightedText(snippet.text, snippet.highlight_ranges)}...
+                                  </Typography>
+                                </Paper>
+                              ))}
+                              {doc.snippets.length > 2 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  +{doc.snippets.length - 2} more matches
+                                </Typography>
+                              )}
+                            </Box>
+                          )}
+
+                          {/* Search Rank */}
+                          {doc.search_rank && (
+                            <Box sx={{ mt: 1 }}>
+                              <Chip 
+                                label={`Relevance: ${(doc.search_rank * 100).toFixed(1)}%`}
+                                size="small" 
+                                color="info"
+                                variant="outlined"
+                                sx={{ fontSize: '0.7rem', height: '18px' }}
+                              />
+                            </Box>
                           )}
                         </Box>
                         

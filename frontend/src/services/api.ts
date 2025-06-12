@@ -27,11 +27,41 @@ export interface SearchRequest {
   mime_types?: string[]
   limit?: number
   offset?: number
+  include_snippets?: boolean
+  snippet_length?: number
+  search_mode?: 'simple' | 'phrase' | 'fuzzy' | 'boolean'
+}
+
+export interface HighlightRange {
+  start: number
+  end: number
+}
+
+export interface SearchSnippet {
+  text: string
+  start_offset: number
+  end_offset: number
+  highlight_ranges: HighlightRange[]
+}
+
+export interface EnhancedDocument {
+  id: string
+  filename: string
+  original_filename: string
+  file_size: number
+  mime_type: string
+  tags: string[]
+  created_at: string
+  has_ocr_text: boolean
+  search_rank?: number
+  snippets: SearchSnippet[]
 }
 
 export interface SearchResponse {
-  documents: Document[]
+  documents: EnhancedDocument[]
   total: number
+  query_time_ms: number
+  suggestions: string[]
 }
 
 export const documentService = {
@@ -60,6 +90,17 @@ export const documentService = {
   search: (searchRequest: SearchRequest) => {
     return api.get<SearchResponse>('/search', {
       params: searchRequest,
+    })
+  },
+
+  enhancedSearch: (searchRequest: SearchRequest) => {
+    return api.get<SearchResponse>('/search/enhanced', {
+      params: {
+        ...searchRequest,
+        include_snippets: searchRequest.include_snippets ?? true,
+        snippet_length: searchRequest.snippet_length ?? 200,
+        search_mode: searchRequest.search_mode ?? 'simple',
+      },
     })
   },
 }

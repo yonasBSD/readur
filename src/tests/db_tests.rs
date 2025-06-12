@@ -147,6 +147,9 @@ mod tests {
             mime_types: None,
             limit: Some(10),
             offset: Some(0),
+            include_snippets: Some(true),
+            snippet_length: Some(200),
+            search_mode: None,
         };
         
         let result = db.search_documents(user.id, search_request).await;

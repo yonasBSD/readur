@@ -74,12 +74,63 @@ pub struct SearchRequest {
     pub mime_types: Option<Vec<String>>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub include_snippets: Option<bool>,
+    pub snippet_length: Option<i32>,
+    pub search_mode: Option<SearchMode>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SearchMode {
+    #[serde(rename = "simple")]
+    Simple,
+    #[serde(rename = "phrase")]
+    Phrase,
+    #[serde(rename = "fuzzy")]
+    Fuzzy,
+    #[serde(rename = "boolean")]
+    Boolean,
+}
+
+impl Default for SearchMode {
+    fn default() -> Self {
+        SearchMode::Simple
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchSnippet {
+    pub text: String,
+    pub start_offset: i32,
+    pub end_offset: i32,
+    pub highlight_ranges: Vec<HighlightRange>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HighlightRange {
+    pub start: i32,
+    pub end: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EnhancedDocumentResponse {
+    pub id: Uuid,
+    pub filename: String,
+    pub original_filename: String,
+    pub file_size: i64,
+    pub mime_type: String,
+    pub tags: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub has_ocr_text: bool,
+    pub search_rank: Option<f32>,
+    pub snippets: Vec<SearchSnippet>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResponse {
-    pub documents: Vec<DocumentResponse>,
+    pub documents: Vec<EnhancedDocumentResponse>,
     pub total: i64,
+    pub query_time_ms: u64,
+    pub suggestions: Vec<String>,
 }
 
 impl From<Document> for DocumentResponse {

@@ -3,7 +3,7 @@ use chrono::Utc;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use crate::models::{CreateUser, Document, SearchRequest, User};
+use crate::models::{CreateUser, Document, SearchRequest, SearchMode, SearchSnippet, HighlightRange, EnhancedDocumentResponse, User};
 
 #[derive(Clone)]
 pub struct Database {
@@ -326,6 +326,169 @@ impl Database {
         let total: i64 = total_row.get("total");
 
         Ok((documents, total))
+    }
+
+    pub async fn enhanced_search_documents(&self, user_id: Uuid, search: SearchRequest) -> Result<(Vec<EnhancedDocumentResponse>, i64, u64)> {
+        let start_time = std::time::Instant::now();
+        
+        // Build search query based on search mode
+        let search_mode = search.search_mode.as_ref().unwrap_or(&SearchMode::Simple);
+        let query_function = match search_mode {
+            SearchMode::Simple => "plainto_tsquery",
+            SearchMode::Phrase => "phraseto_tsquery", 
+            SearchMode::Fuzzy => "plainto_tsquery", // Could be enhanced with similarity
+            SearchMode::Boolean => "to_tsquery",
+        };
+
+        let mut query_builder = sqlx::QueryBuilder::new(&format!(
+            r#"
+            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, tags, created_at, updated_at, user_id,
+                   ts_rank(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')), {}('english', "#,
+            query_function
+        ));
+        
+        query_builder.push_bind(&search.query);
+        query_builder.push(&format!(")) as rank FROM documents WHERE user_id = "));
+        query_builder.push_bind(user_id);
+        query_builder.push(&format!(" AND to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ {}('english', ", query_function));
+        query_builder.push_bind(&search.query);
+        query_builder.push(")");
+
+        if let Some(tags) = &search.tags {
+            if !tags.is_empty() {
+                query_builder.push(" AND tags && ");
+                query_builder.push_bind(tags);
+            }
+        }
+
+        if let Some(mime_types) = &search.mime_types {
+            if !mime_types.is_empty() {
+                query_builder.push(" AND mime_type = ANY(");
+                query_builder.push_bind(mime_types);
+                query_builder.push(")");
+            }
+        }
+
+        query_builder.push(" ORDER BY rank DESC, created_at DESC");
+        
+        if let Some(limit) = search.limit {
+            query_builder.push(" LIMIT ");
+            query_builder.push_bind(limit);
+        }
+        
+        if let Some(offset) = search.offset {
+            query_builder.push(" OFFSET ");
+            query_builder.push_bind(offset);
+        }
+
+        let rows = query_builder.build().fetch_all(&self.pool).await?;
+
+        let include_snippets = search.include_snippets.unwrap_or(true);
+        let snippet_length = search.snippet_length.unwrap_or(200);
+
+        let mut documents = Vec::new();
+        for row in rows {
+            let doc_id: Uuid = row.get("id");
+            let content: Option<String> = row.get("content");
+            let ocr_text: Option<String> = row.get("ocr_text");
+            let rank: f32 = row.get("rank");
+
+            let snippets = if include_snippets {
+                self.generate_snippets(&search.query, content.as_deref(), ocr_text.as_deref(), snippet_length)
+            } else {
+                Vec::new()
+            };
+
+            documents.push(EnhancedDocumentResponse {
+                id: doc_id,
+                filename: row.get("filename"),
+                original_filename: row.get("original_filename"),
+                file_size: row.get("file_size"),
+                mime_type: row.get("mime_type"),
+                tags: row.get("tags"),
+                created_at: row.get("created_at"),
+                has_ocr_text: ocr_text.is_some(),
+                search_rank: Some(rank),
+                snippets,
+            });
+        }
+
+        let total_row = sqlx::query(&format!(
+            r#"
+            SELECT COUNT(*) as total FROM documents 
+            WHERE user_id = $1 
+            AND to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ {}('english', $2)
+            "#, query_function
+        ))
+        .bind(user_id)
+        .bind(&search.query)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let total: i64 = total_row.get("total");
+        let query_time = start_time.elapsed().as_millis() as u64;
+
+        Ok((documents, total, query_time))
+    }
+
+    fn generate_snippets(&self, query: &str, content: Option<&str>, ocr_text: Option<&str>, snippet_length: i32) -> Vec<SearchSnippet> {
+        let mut snippets = Vec::new();
+        
+        // Combine content and OCR text
+        let full_text = match (content, ocr_text) {
+            (Some(c), Some(o)) => format!("{} {}", c, o),
+            (Some(c), None) => c.to_string(),
+            (None, Some(o)) => o.to_string(),
+            (None, None) => return snippets,
+        };
+
+        // Simple keyword matching for snippets (could be enhanced with better search algorithms)
+        let _query_terms: Vec<&str> = query.split_whitespace().collect();
+        let text_lower = full_text.to_lowercase();
+        let query_lower = query.to_lowercase();
+
+        // Find matches
+        for (i, _) in text_lower.match_indices(&query_lower) {
+            let snippet_start = if i >= snippet_length as usize / 2 {
+                i - snippet_length as usize / 2
+            } else {
+                0
+            };
+            
+            let snippet_end = std::cmp::min(
+                snippet_start + snippet_length as usize,
+                full_text.len()
+            );
+
+            if snippet_start < full_text.len() {
+                let snippet_text = &full_text[snippet_start..snippet_end];
+                
+                // Find highlight ranges within this snippet
+                let mut highlight_ranges = Vec::new();
+                let snippet_lower = snippet_text.to_lowercase();
+                
+                for (match_start, _) in snippet_lower.match_indices(&query_lower) {
+                    highlight_ranges.push(HighlightRange {
+                        start: match_start as i32,
+                        end: (match_start + query.len()) as i32,
+                    });
+                }
+
+                snippets.push(SearchSnippet {
+                    text: snippet_text.to_string(),
+                    start_offset: snippet_start as i32,
+                    end_offset: snippet_end as i32,
+                    highlight_ranges,
+                });
+
+                // Limit to a few snippets per document
+                if snippets.len() >= 3 {
+                    break;
+                }
+            }
+        }
+
+        snippets
     }
 
     pub async fn update_document_ocr(&self, id: Uuid, ocr_text: &str) -> Result<()> {
