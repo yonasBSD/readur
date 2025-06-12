@@ -92,6 +92,21 @@ impl Database {
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
                 ocr_language VARCHAR(10) DEFAULT 'eng',
+                concurrent_ocr_jobs INT DEFAULT 4,
+                ocr_timeout_seconds INT DEFAULT 300,
+                max_file_size_mb INT DEFAULT 50,
+                allowed_file_types TEXT[] DEFAULT ARRAY['pdf', 'png', 'jpg', 'jpeg', 'tiff', 'bmp', 'txt'],
+                auto_rotate_images BOOLEAN DEFAULT TRUE,
+                enable_image_preprocessing BOOLEAN DEFAULT TRUE,
+                search_results_per_page INT DEFAULT 25,
+                search_snippet_length INT DEFAULT 200,
+                fuzzy_search_threshold REAL DEFAULT 0.8,
+                retention_days INT,
+                enable_auto_cleanup BOOLEAN DEFAULT FALSE,
+                enable_compression BOOLEAN DEFAULT FALSE,
+                memory_limit_mb INT DEFAULT 512,
+                cpu_priority VARCHAR(10) DEFAULT 'normal',
+                enable_background_ocr BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             )
@@ -569,7 +584,12 @@ impl Database {
 
     pub async fn get_user_settings(&self, user_id: Uuid) -> Result<Option<crate::models::Settings>> {
         let row = sqlx::query(
-            "SELECT id, user_id, ocr_language, created_at, updated_at FROM settings WHERE user_id = $1"
+            r#"SELECT id, user_id, ocr_language, concurrent_ocr_jobs, ocr_timeout_seconds,
+               max_file_size_mb, allowed_file_types, auto_rotate_images, enable_image_preprocessing,
+               search_results_per_page, search_snippet_length, fuzzy_search_threshold,
+               retention_days, enable_auto_cleanup, enable_compression, memory_limit_mb,
+               cpu_priority, enable_background_ocr, created_at, updated_at
+               FROM settings WHERE user_id = $1"#
         )
         .bind(user_id)
         .fetch_optional(&self.pool)
@@ -580,6 +600,21 @@ impl Database {
                 id: row.get("id"),
                 user_id: row.get("user_id"),
                 ocr_language: row.get("ocr_language"),
+                concurrent_ocr_jobs: row.get("concurrent_ocr_jobs"),
+                ocr_timeout_seconds: row.get("ocr_timeout_seconds"),
+                max_file_size_mb: row.get("max_file_size_mb"),
+                allowed_file_types: row.get("allowed_file_types"),
+                auto_rotate_images: row.get("auto_rotate_images"),
+                enable_image_preprocessing: row.get("enable_image_preprocessing"),
+                search_results_per_page: row.get("search_results_per_page"),
+                search_snippet_length: row.get("search_snippet_length"),
+                fuzzy_search_threshold: row.get("fuzzy_search_threshold"),
+                retention_days: row.get("retention_days"),
+                enable_auto_cleanup: row.get("enable_auto_cleanup"),
+                enable_compression: row.get("enable_compression"),
+                memory_limit_mb: row.get("memory_limit_mb"),
+                cpu_priority: row.get("cpu_priority"),
+                enable_background_ocr: row.get("enable_background_ocr"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             })),
@@ -587,18 +622,70 @@ impl Database {
         }
     }
 
-    pub async fn create_or_update_settings(&self, user_id: Uuid, ocr_language: &str) -> Result<crate::models::Settings> {
+    pub async fn create_or_update_settings(&self, user_id: Uuid, settings: &crate::models::UpdateSettings) -> Result<crate::models::Settings> {
+        // Get existing settings to merge with updates
+        let existing = self.get_user_settings(user_id).await?;
+        let defaults = crate::models::Settings::default();
+        
+        // Merge existing/defaults with updates
+        let current = existing.unwrap_or_else(|| {
+            let mut s = defaults;
+            s.user_id = user_id;
+            s
+        });
+        
         let row = sqlx::query(
             r#"
-            INSERT INTO settings (user_id, ocr_language)
-            VALUES ($1, $2)
-            ON CONFLICT (user_id) DO UPDATE
-            SET ocr_language = $2, updated_at = NOW()
-            RETURNING id, user_id, ocr_language, created_at, updated_at
+            INSERT INTO settings (
+                user_id, ocr_language, concurrent_ocr_jobs, ocr_timeout_seconds,
+                max_file_size_mb, allowed_file_types, auto_rotate_images, enable_image_preprocessing,
+                search_results_per_page, search_snippet_length, fuzzy_search_threshold,
+                retention_days, enable_auto_cleanup, enable_compression, memory_limit_mb,
+                cpu_priority, enable_background_ocr
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            ON CONFLICT (user_id) DO UPDATE SET
+                ocr_language = $2,
+                concurrent_ocr_jobs = $3,
+                ocr_timeout_seconds = $4,
+                max_file_size_mb = $5,
+                allowed_file_types = $6,
+                auto_rotate_images = $7,
+                enable_image_preprocessing = $8,
+                search_results_per_page = $9,
+                search_snippet_length = $10,
+                fuzzy_search_threshold = $11,
+                retention_days = $12,
+                enable_auto_cleanup = $13,
+                enable_compression = $14,
+                memory_limit_mb = $15,
+                cpu_priority = $16,
+                enable_background_ocr = $17,
+                updated_at = NOW()
+            RETURNING id, user_id, ocr_language, concurrent_ocr_jobs, ocr_timeout_seconds,
+                      max_file_size_mb, allowed_file_types, auto_rotate_images, enable_image_preprocessing,
+                      search_results_per_page, search_snippet_length, fuzzy_search_threshold,
+                      retention_days, enable_auto_cleanup, enable_compression, memory_limit_mb,
+                      cpu_priority, enable_background_ocr, created_at, updated_at
             "#
         )
         .bind(user_id)
-        .bind(ocr_language)
+        .bind(settings.ocr_language.as_ref().unwrap_or(&current.ocr_language))
+        .bind(settings.concurrent_ocr_jobs.unwrap_or(current.concurrent_ocr_jobs))
+        .bind(settings.ocr_timeout_seconds.unwrap_or(current.ocr_timeout_seconds))
+        .bind(settings.max_file_size_mb.unwrap_or(current.max_file_size_mb))
+        .bind(settings.allowed_file_types.as_ref().unwrap_or(&current.allowed_file_types))
+        .bind(settings.auto_rotate_images.unwrap_or(current.auto_rotate_images))
+        .bind(settings.enable_image_preprocessing.unwrap_or(current.enable_image_preprocessing))
+        .bind(settings.search_results_per_page.unwrap_or(current.search_results_per_page))
+        .bind(settings.search_snippet_length.unwrap_or(current.search_snippet_length))
+        .bind(settings.fuzzy_search_threshold.unwrap_or(current.fuzzy_search_threshold))
+        .bind(settings.retention_days.unwrap_or(current.retention_days))
+        .bind(settings.enable_auto_cleanup.unwrap_or(current.enable_auto_cleanup))
+        .bind(settings.enable_compression.unwrap_or(current.enable_compression))
+        .bind(settings.memory_limit_mb.unwrap_or(current.memory_limit_mb))
+        .bind(settings.cpu_priority.as_ref().unwrap_or(&current.cpu_priority))
+        .bind(settings.enable_background_ocr.unwrap_or(current.enable_background_ocr))
         .fetch_one(&self.pool)
         .await?;
 
@@ -606,6 +693,21 @@ impl Database {
             id: row.get("id"),
             user_id: row.get("user_id"),
             ocr_language: row.get("ocr_language"),
+            concurrent_ocr_jobs: row.get("concurrent_ocr_jobs"),
+            ocr_timeout_seconds: row.get("ocr_timeout_seconds"),
+            max_file_size_mb: row.get("max_file_size_mb"),
+            allowed_file_types: row.get("allowed_file_types"),
+            auto_rotate_images: row.get("auto_rotate_images"),
+            enable_image_preprocessing: row.get("enable_image_preprocessing"),
+            search_results_per_page: row.get("search_results_per_page"),
+            search_snippet_length: row.get("search_snippet_length"),
+            fuzzy_search_threshold: row.get("fuzzy_search_threshold"),
+            retention_days: row.get("retention_days"),
+            enable_auto_cleanup: row.get("enable_auto_cleanup"),
+            enable_compression: row.get("enable_compression"),
+            memory_limit_mb: row.get("memory_limit_mb"),
+            cpu_priority: row.get("cpu_priority"),
+            enable_background_ocr: row.get("enable_background_ocr"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })

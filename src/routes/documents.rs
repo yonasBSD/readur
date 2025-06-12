@@ -37,6 +37,14 @@ async fn upload_document(
 ) -> Result<Json<DocumentResponse>, StatusCode> {
     let file_service = FileService::new(state.config.upload_path.clone());
     
+    // Get user settings for file upload restrictions
+    let settings = state
+        .db
+        .get_user_settings(auth_user.user.id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .unwrap_or_else(|| crate::models::Settings::default());
+    
     while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
         let name = field.name().unwrap_or("").to_string();
         
@@ -46,12 +54,18 @@ async fn upload_document(
                 .ok_or(StatusCode::BAD_REQUEST)?
                 .to_string();
             
-            if !file_service.is_allowed_file_type(&filename, &state.config.allowed_file_types) {
+            if !file_service.is_allowed_file_type(&filename, &settings.allowed_file_types) {
                 return Err(StatusCode::BAD_REQUEST);
             }
             
             let data = field.bytes().await.map_err(|_| StatusCode::BAD_REQUEST)?;
             let file_size = data.len() as i64;
+            
+            // Check file size limit
+            let max_size_bytes = (settings.max_file_size_mb as i64) * 1024 * 1024;
+            if file_size > max_size_bytes {
+                return Err(StatusCode::PAYLOAD_TOO_LARGE);
+            }
             
             let mime_type = mime_guess::from_path(&filename)
                 .first_or_octet_stream()
@@ -81,15 +95,19 @@ async fn upload_document(
             let db_clone = state.db.clone();
             let file_path_clone = file_path.clone();
             let mime_type_clone = mime_type.clone();
+            let ocr_language = settings.ocr_language.clone();
+            let enable_background_ocr = settings.enable_background_ocr;
             
-            spawn(async move {
-                let ocr_service = OcrService::new();
-                if let Ok(text) = ocr_service.extract_text(&file_path_clone, &mime_type_clone).await {
-                    if !text.is_empty() {
-                        let _ = db_clone.update_document_ocr(document_id, &text).await;
+            if enable_background_ocr {
+                spawn(async move {
+                    let ocr_service = OcrService::new();
+                    if let Ok(text) = ocr_service.extract_text_with_lang(&file_path_clone, &mime_type_clone, &ocr_language).await {
+                        if !text.is_empty() {
+                            let _ = db_clone.update_document_ocr(document_id, &text).await;
+                        }
                     }
-                }
-            });
+                });
+            }
             
             return Ok(Json(saved_document.into()));
         }

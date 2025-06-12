@@ -7,6 +7,7 @@ import {
   Tabs,
   Tab,
   FormControl,
+  FormControlLabel,
   InputLabel,
   Select,
   MenuItem,
@@ -29,6 +30,7 @@ import {
   Card,
   CardContent,
   Divider,
+  Switch,
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,6 +41,21 @@ const SettingsPage = () => {
   const [tabValue, setTabValue] = useState(0);
   const [settings, setSettings] = useState({
     ocrLanguage: 'eng',
+    concurrentOcrJobs: 4,
+    ocrTimeoutSeconds: 300,
+    maxFileSizeMb: 50,
+    allowedFileTypes: ['pdf', 'png', 'jpg', 'jpeg', 'tiff', 'bmp', 'txt'],
+    autoRotateImages: true,
+    enableImagePreprocessing: true,
+    searchResultsPerPage: 25,
+    searchSnippetLength: 200,
+    fuzzySearchThreshold: 0.8,
+    retentionDays: null,
+    enableAutoCleanup: false,
+    enableCompression: false,
+    memoryLimitMb: 512,
+    cpuPriority: 'normal',
+    enableBackgroundOcr: true,
   });
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -72,7 +89,24 @@ const SettingsPage = () => {
   const fetchSettings = async () => {
     try {
       const response = await api.get('/settings');
-      setSettings(response.data);
+      setSettings({
+        ocrLanguage: response.data.ocr_language || 'eng',
+        concurrentOcrJobs: response.data.concurrent_ocr_jobs || 4,
+        ocrTimeoutSeconds: response.data.ocr_timeout_seconds || 300,
+        maxFileSizeMb: response.data.max_file_size_mb || 50,
+        allowedFileTypes: response.data.allowed_file_types || ['pdf', 'png', 'jpg', 'jpeg', 'tiff', 'bmp', 'txt'],
+        autoRotateImages: response.data.auto_rotate_images !== undefined ? response.data.auto_rotate_images : true,
+        enableImagePreprocessing: response.data.enable_image_preprocessing !== undefined ? response.data.enable_image_preprocessing : true,
+        searchResultsPerPage: response.data.search_results_per_page || 25,
+        searchSnippetLength: response.data.search_snippet_length || 200,
+        fuzzySearchThreshold: response.data.fuzzy_search_threshold || 0.8,
+        retentionDays: response.data.retention_days,
+        enableAutoCleanup: response.data.enable_auto_cleanup || false,
+        enableCompression: response.data.enable_compression || false,
+        memoryLimitMb: response.data.memory_limit_mb || 512,
+        cpuPriority: response.data.cpu_priority || 'normal',
+        enableBackgroundOcr: response.data.enable_background_ocr !== undefined ? response.data.enable_background_ocr : true,
+      });
     } catch (error) {
       console.error('Error fetching settings:', error);
       if (error.response?.status !== 404) {
@@ -96,7 +130,14 @@ const SettingsPage = () => {
   const handleSettingsChange = async (key, value) => {
     setLoading(true);
     try {
-      await api.put('/settings', { ...settings, [key]: value });
+      // Convert camelCase to snake_case for API
+      const snakeCase = (str) => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      const apiKey = snakeCase(key);
+      
+      // Build the update payload with only the changed field
+      const updatePayload = { [apiKey]: value };
+      
+      await api.put('/settings', updatePayload);
       setSettings({ ...settings, [key]: value });
       showSnackbar('Settings updated successfully', 'success');
     } catch (error) {
@@ -199,24 +240,258 @@ const SettingsPage = () => {
                     OCR Configuration
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  <FormControl fullWidth>
-                    <InputLabel>OCR Language</InputLabel>
-                    <Select
-                      value={settings.ocrLanguage}
-                      label="OCR Language"
-                      onChange={(e) => handleSettingsChange('ocrLanguage', e.target.value)}
-                      disabled={loading}
-                    >
-                      {ocrLanguages.map((lang) => (
-                        <MenuItem key={lang.code} value={lang.code}>
-                          {lang.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Select the primary language for OCR text extraction. This affects how accurately text is recognized from images and scanned documents.
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>OCR Language</InputLabel>
+                        <Select
+                          value={settings.ocrLanguage}
+                          label="OCR Language"
+                          onChange={(e) => handleSettingsChange('ocrLanguage', e.target.value)}
+                          disabled={loading}
+                        >
+                          {ocrLanguages.map((lang) => (
+                            <MenuItem key={lang.code} value={lang.code}>
+                              {lang.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Concurrent OCR Jobs"
+                        value={settings.concurrentOcrJobs}
+                        onChange={(e) => handleSettingsChange('concurrentOcrJobs', parseInt(e.target.value))}
+                        disabled={loading}
+                        inputProps={{ min: 1, max: 16 }}
+                        helperText="Number of OCR jobs that can run simultaneously"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="OCR Timeout (seconds)"
+                        value={settings.ocrTimeoutSeconds}
+                        onChange={(e) => handleSettingsChange('ocrTimeoutSeconds', parseInt(e.target.value))}
+                        disabled={loading}
+                        inputProps={{ min: 30, max: 3600 }}
+                        helperText="Maximum time for OCR processing per file"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>CPU Priority</InputLabel>
+                        <Select
+                          value={settings.cpuPriority}
+                          label="CPU Priority"
+                          onChange={(e) => handleSettingsChange('cpuPriority', e.target.value)}
+                          disabled={loading}
+                        >
+                          <MenuItem value="low">Low</MenuItem>
+                          <MenuItem value="normal">Normal</MenuItem>
+                          <MenuItem value="high">High</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              <Card sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                    File Processing
                   </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Max File Size (MB)"
+                        value={settings.maxFileSizeMb}
+                        onChange={(e) => handleSettingsChange('maxFileSizeMb', parseInt(e.target.value))}
+                        disabled={loading}
+                        inputProps={{ min: 1, max: 500 }}
+                        helperText="Maximum allowed file size for uploads"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Memory Limit (MB)"
+                        value={settings.memoryLimitMb}
+                        onChange={(e) => handleSettingsChange('memoryLimitMb', parseInt(e.target.value))}
+                        disabled={loading}
+                        inputProps={{ min: 128, max: 4096 }}
+                        helperText="Memory limit per OCR job"
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl sx={{ mb: 2 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={settings.autoRotateImages}
+                              onChange={(e) => handleSettingsChange('autoRotateImages', e.target.checked)}
+                              disabled={loading}
+                            />
+                          }
+                          label="Auto-rotate Images"
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          Automatically detect and correct image orientation
+                        </Typography>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl sx={{ mb: 2 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={settings.enableImagePreprocessing}
+                              onChange={(e) => handleSettingsChange('enableImagePreprocessing', e.target.checked)}
+                              disabled={loading}
+                            />
+                          }
+                          label="Enable Image Preprocessing"
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          Enhance images for better OCR accuracy (deskew, denoise, contrast)
+                        </Typography>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl sx={{ mb: 2 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={settings.enableBackgroundOcr}
+                              onChange={(e) => handleSettingsChange('enableBackgroundOcr', e.target.checked)}
+                              disabled={loading}
+                            />
+                          }
+                          label="Enable Background OCR"
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          Process OCR in the background after file upload
+                        </Typography>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              <Card sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                    Search Configuration
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Results Per Page</InputLabel>
+                        <Select
+                          value={settings.searchResultsPerPage}
+                          label="Results Per Page"
+                          onChange={(e) => handleSettingsChange('searchResultsPerPage', parseInt(e.target.value))}
+                          disabled={loading}
+                        >
+                          <MenuItem value={10}>10</MenuItem>
+                          <MenuItem value={25}>25</MenuItem>
+                          <MenuItem value={50}>50</MenuItem>
+                          <MenuItem value={100}>100</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Snippet Length"
+                        value={settings.searchSnippetLength}
+                        onChange={(e) => handleSettingsChange('searchSnippetLength', parseInt(e.target.value))}
+                        disabled={loading}
+                        inputProps={{ min: 50, max: 500 }}
+                        helperText="Characters to show in search result previews"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Fuzzy Search Threshold"
+                        value={settings.fuzzySearchThreshold}
+                        onChange={(e) => handleSettingsChange('fuzzySearchThreshold', parseFloat(e.target.value))}
+                        disabled={loading}
+                        inputProps={{ min: 0, max: 1, step: 0.1 }}
+                        helperText="Tolerance for spelling mistakes (0.0-1.0)"
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              <Card sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                    Storage Management
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Retention Days"
+                        value={settings.retentionDays || ''}
+                        onChange={(e) => handleSettingsChange('retentionDays', e.target.value ? parseInt(e.target.value) : null)}
+                        disabled={loading}
+                        inputProps={{ min: 1 }}
+                        helperText="Auto-delete documents after X days (leave empty to disable)"
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl sx={{ mb: 2 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={settings.enableAutoCleanup}
+                              onChange={(e) => handleSettingsChange('enableAutoCleanup', e.target.checked)}
+                              disabled={loading}
+                            />
+                          }
+                          label="Enable Auto Cleanup"
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          Automatically remove orphaned files and clean up storage
+                        </Typography>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl sx={{ mb: 2 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={settings.enableCompression}
+                              onChange={(e) => handleSettingsChange('enableCompression', e.target.checked)}
+                              disabled={loading}
+                            />
+                          }
+                          label="Enable Compression"
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          Compress stored documents to save disk space
+                        </Typography>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
                 </CardContent>
               </Card>
             </Box>

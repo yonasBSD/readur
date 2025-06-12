@@ -1,6 +1,6 @@
 use axum::{
     http::StatusCode,
-    response::Json,
+    response::{Json, Html},
     routing::get,
     Router,
 };
@@ -52,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api/settings", routes::settings::router())
         .nest("/api/users", routes::users::router())
         .nest_service("/", ServeDir::new("/app/frontend"))
+        .fallback(serve_spa)
         .layer(CorsLayer::permissive())
         .with_state(Arc::new(state));
     
@@ -72,4 +73,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn health_check() -> Result<Json<serde_json::Value>, StatusCode> {
     Ok(Json(serde_json::json!({"status": "ok"})))
+}
+
+async fn serve_spa() -> Result<Html<String>, StatusCode> {
+    match tokio::fs::read_to_string("/app/frontend/index.html").await {
+        Ok(html) => Ok(Html(html)),
+        Err(_) => Err(StatusCode::NOT_FOUND),
+    }
 }

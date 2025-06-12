@@ -170,6 +170,21 @@ pub struct Settings {
     pub id: Uuid,
     pub user_id: Uuid,
     pub ocr_language: String,
+    pub concurrent_ocr_jobs: i32,
+    pub ocr_timeout_seconds: i32,
+    pub max_file_size_mb: i32,
+    pub allowed_file_types: Vec<String>,
+    pub auto_rotate_images: bool,
+    pub enable_image_preprocessing: bool,
+    pub search_results_per_page: i32,
+    pub search_snippet_length: i32,
+    pub fuzzy_search_threshold: f32,
+    pub retention_days: Option<i32>,
+    pub enable_auto_cleanup: bool,
+    pub enable_compression: bool,
+    pub memory_limit_mb: i32,
+    pub cpu_priority: String,
+    pub enable_background_ocr: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -177,17 +192,97 @@ pub struct Settings {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SettingsResponse {
     pub ocr_language: String,
+    pub concurrent_ocr_jobs: i32,
+    pub ocr_timeout_seconds: i32,
+    pub max_file_size_mb: i32,
+    pub allowed_file_types: Vec<String>,
+    pub auto_rotate_images: bool,
+    pub enable_image_preprocessing: bool,
+    pub search_results_per_page: i32,
+    pub search_snippet_length: i32,
+    pub fuzzy_search_threshold: f32,
+    pub retention_days: Option<i32>,
+    pub enable_auto_cleanup: bool,
+    pub enable_compression: bool,
+    pub memory_limit_mb: i32,
+    pub cpu_priority: String,
+    pub enable_background_ocr: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateSettings {
-    pub ocr_language: String,
+    pub ocr_language: Option<String>,
+    pub concurrent_ocr_jobs: Option<i32>,
+    pub ocr_timeout_seconds: Option<i32>,
+    pub max_file_size_mb: Option<i32>,
+    pub allowed_file_types: Option<Vec<String>>,
+    pub auto_rotate_images: Option<bool>,
+    pub enable_image_preprocessing: Option<bool>,
+    pub search_results_per_page: Option<i32>,
+    pub search_snippet_length: Option<i32>,
+    pub fuzzy_search_threshold: Option<f32>,
+    pub retention_days: Option<Option<i32>>,
+    pub enable_auto_cleanup: Option<bool>,
+    pub enable_compression: Option<bool>,
+    pub memory_limit_mb: Option<i32>,
+    pub cpu_priority: Option<String>,
+    pub enable_background_ocr: Option<bool>,
 }
 
 impl From<Settings> for SettingsResponse {
     fn from(settings: Settings) -> Self {
         Self {
             ocr_language: settings.ocr_language,
+            concurrent_ocr_jobs: settings.concurrent_ocr_jobs,
+            ocr_timeout_seconds: settings.ocr_timeout_seconds,
+            max_file_size_mb: settings.max_file_size_mb,
+            allowed_file_types: settings.allowed_file_types,
+            auto_rotate_images: settings.auto_rotate_images,
+            enable_image_preprocessing: settings.enable_image_preprocessing,
+            search_results_per_page: settings.search_results_per_page,
+            search_snippet_length: settings.search_snippet_length,
+            fuzzy_search_threshold: settings.fuzzy_search_threshold,
+            retention_days: settings.retention_days,
+            enable_auto_cleanup: settings.enable_auto_cleanup,
+            enable_compression: settings.enable_compression,
+            memory_limit_mb: settings.memory_limit_mb,
+            cpu_priority: settings.cpu_priority,
+            enable_background_ocr: settings.enable_background_ocr,
+        }
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            user_id: Uuid::nil(),
+            ocr_language: "eng".to_string(),
+            concurrent_ocr_jobs: 4,
+            ocr_timeout_seconds: 300,
+            max_file_size_mb: 50,
+            allowed_file_types: vec![
+                "pdf".to_string(),
+                "png".to_string(),
+                "jpg".to_string(),
+                "jpeg".to_string(),
+                "tiff".to_string(),
+                "bmp".to_string(),
+                "txt".to_string(),
+            ],
+            auto_rotate_images: true,
+            enable_image_preprocessing: true,
+            search_results_per_page: 25,
+            search_snippet_length: 200,
+            fuzzy_search_threshold: 0.8,
+            retention_days: None,
+            enable_auto_cleanup: false,
+            enable_compression: false,
+            memory_limit_mb: 512,
+            cpu_priority: "normal".to_string(),
+            enable_background_ocr: true,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         }
     }
 }
