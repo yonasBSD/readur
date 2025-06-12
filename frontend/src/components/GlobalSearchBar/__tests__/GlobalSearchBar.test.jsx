@@ -74,7 +74,7 @@ const renderWithRouter = (component) => {
 
 describe('GlobalSearchBar', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
     documentService.enhancedSearch.mockResolvedValue(mockSearchResponse);
   });
