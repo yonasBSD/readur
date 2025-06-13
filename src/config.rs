@@ -31,8 +31,16 @@ impl Config {
         Ok(Config {
             database_url: env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "postgresql://readur:readur@localhost/readur".to_string()),
-            server_address: env::var("SERVER_ADDRESS")
-                .unwrap_or_else(|_| "0.0.0.0:8000".to_string()),
+            server_address: {
+                // Support both SERVER_ADDRESS (full address) and SERVER_PORT (just port)
+                if let Ok(addr) = env::var("SERVER_ADDRESS") {
+                    addr
+                } else {
+                    let host = env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+                    let port = env::var("SERVER_PORT").unwrap_or_else(|_| "8000".to_string());
+                    format!("{}:{}", host, port)
+                }
+            },
             jwt_secret: env::var("JWT_SECRET")
                 .unwrap_or_else(|_| "your-secret-key".to_string()),
             upload_path: env::var("UPLOAD_PATH")

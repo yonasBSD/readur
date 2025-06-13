@@ -142,6 +142,25 @@ volumes:
 
 ### Environment Variables
 
+#### Port Configuration
+
+Readur supports flexible port configuration:
+
+```bash
+# Method 1: Specify full server address
+SERVER_ADDRESS=0.0.0.0:3000
+
+# Method 2: Use separate host and port (recommended)
+SERVER_HOST=0.0.0.0
+SERVER_PORT=3000
+
+# For development: Configure frontend port
+CLIENT_PORT=5173
+BACKEND_PORT=8000
+```
+
+#### Security Configuration
+
 Create a `.env` file for your secrets:
 
 ```bash
@@ -242,6 +261,8 @@ services:
       - "traefik.http.routers.readur.tls=true"
       - "traefik.http.routers.readur.tls.certresolver=letsencrypt"
 ```
+
+> 📘 **For detailed reverse proxy configurations** including Apache, Caddy, custom ports, load balancing, and advanced scenarios, see [REVERSE_PROXY.md](./REVERSE_PROXY.md).
 
 ### Health Checks
 

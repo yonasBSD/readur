@@ -1,34 +1,100 @@
-services:
-  readur:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://readur:readur_password@postgres:5432/readur
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-      - UPLOAD_PATH=/app/uploads
-      - WATCH_FOLDER=/app/watch
-      - RUST_BACKTRACE=1
-    volumes:
-      - uploads:/app/uploads
-      - watch:/app/watch
-    depends_on:
-      - postgres
-    restart: unless-stopped
+version: '3.8'
 
+services:
   postgres:
-    image: postgres:15
+    image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=readur
-      - POSTGRES_PASSWORD=readur_password
-      - POSTGRES_DB=readur
+      POSTGRES_USER: readur
+      POSTGRES_PASSWORD: readur
+      POSTGRES_DB: readur
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
-    restart: unless-stopped
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U readur"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  readur:
+    build: .
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql://readur:readur@postgres/readur
+      
+      # Server configuration - choose one of these methods:
+      # Method 1: Use SERVER_ADDRESS for full control
+      # SERVER_ADDRESS: 0.0.0.0:8080
+      
+      # Method 2: Use SERVER_HOST and SERVER_PORT separately
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      
+      # Security
+      JWT_SECRET: your-secret-key-change-this-in-production
+      
+      # File paths
+      UPLOAD_PATH: /app/uploads
+      WATCH_FOLDER: /app/watch
+      
+      # OCR configuration
+      OCR_LANGUAGE: eng
+      CONCURRENT_OCR_JOBS: 4
+      OCR_TIMEOUT_SECONDS: 300
+      MAX_FILE_SIZE_MB: 50
+      
+      # Performance
+      MEMORY_LIMIT_MB: 512
+      CPU_PRIORITY: normal
+      
+      # File watching
+      ALLOWED_FILE_TYPES: pdf,txt,doc,docx,png,jpg,jpeg
+      WATCH_INTERVAL_SECONDS: 30
+      FILE_STABILITY_CHECK_MS: 1000
+      MAX_FILE_AGE_HOURS: 24
+    
+    ports:
+      # Map container port to host port
+      # Format: "host_port:container_port"
+      - "8080:8080"
+    
+    volumes:
+      # Persistent storage for uploads
+      - readur_uploads:/app/uploads
+      
+      # Watch folder - can be mapped to a host directory
+      - ./watch:/app/watch
+      
+      # Or use a named volume for watch folder
+      # - readur_watch:/app/watch
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Nginx reverse proxy example
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - readur
+    profiles:
+      - with-proxy
 
 volumes:
-  uploads:
-  watch:
   postgres_data:
+  readur_uploads:
+  readur_watch:
