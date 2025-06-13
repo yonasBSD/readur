@@ -133,6 +133,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Seed admin user
     seed::seed_admin_user(&db).await?;
     
+    // Seed system user for watcher
+    seed::seed_system_user(&db).await?;
+    
     let state = AppState { db, config: config.clone() };
     
     let app = Router::new()

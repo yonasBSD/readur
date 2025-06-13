@@ -295,11 +295,25 @@ async fn process_file(
         }
     }
     
+    // Validate PDF files before processing
+    if mime_type == "application/pdf" {
+        if file_data.len() < 5 || !file_data.starts_with(b"%PDF-") {
+            warn!(
+                "Skipping invalid PDF file: {} (size: {} bytes, header: {:?})",
+                filename,
+                file_data.len(),
+                file_data.get(0..20).unwrap_or(&[]).iter().map(|&b| b as char).collect::<String>()
+            );
+            return Ok(());
+        }
+    }
+    
     let saved_file_path = file_service.save_file(&filename, &file_data).await?;
     
-    // TODO: Make this configurable or fetch from database
-    // Using admin user ID for watch folder documents
-    let system_user_id = uuid::Uuid::parse_str("c2e66705-e54b-4eff-91f5-760cb0a69b62")?;
+    // Fetch system user ID from database
+    let system_user = db.get_user_by_username("system").await?
+        .ok_or_else(|| anyhow::anyhow!("System user not found. Please ensure the system user is created."))?;
+    let system_user_id = system_user.id;
     
     let document = file_service.create_document(
         &filename,

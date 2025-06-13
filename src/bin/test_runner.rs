@@ -170,7 +170,7 @@ fn run_frontend_tests() -> Result<TestResult, Box<dyn std::error::Error>> {
 
 fn check_server_running() -> Result<(), Box<dyn std::error::Error>> {
     let output = Command::new("curl")
-        .args(&["-s", "-f", "http://localhost:8080/api/health"])
+        .args(&["-s", "-f", "http://localhost:8000/api/health"])
         .output()?;
     
     if output.status.success() {
@@ -180,7 +180,7 @@ fn check_server_running() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
-    Err("Server not running or not healthy at http://localhost:8080".into())
+    Err("Server not running or not healthy at http://localhost:8000".into())
 }
 
 fn print_summary(results: &[TestResult]) {

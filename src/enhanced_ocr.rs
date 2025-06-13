@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "ocr")]
@@ -503,7 +503,26 @@ impl EnhancedOcrService {
         info!("Extracting text from PDF: {}", file_path);
         
         let bytes = std::fs::read(file_path)?;
-        let text = pdf_extract::extract_text_from_mem(&bytes)?;
+        
+        // Validate PDF header
+        if bytes.len() < 5 || !bytes.starts_with(b"%PDF-") {
+            return Err(anyhow!(
+                "Invalid PDF file: Missing or corrupted PDF header. File size: {} bytes, Header: {:?}", 
+                bytes.len(),
+                bytes.get(0..20).unwrap_or(&[]).iter().map(|&b| b as char).collect::<String>()
+            ));
+        }
+        
+        let text = match pdf_extract::extract_text_from_mem(&bytes) {
+            Ok(text) => text,
+            Err(e) => {
+                // Provide more detailed error information
+                return Err(anyhow!(
+                    "PDF text extraction failed for file '{}' (size: {} bytes): {}. This may indicate a corrupted or unsupported PDF format.",
+                    file_path, bytes.len(), e
+                ));
+            }
+        };
         
         let processing_time = start_time.elapsed().as_millis() as u64;
         let word_count = text.split_whitespace().count();
