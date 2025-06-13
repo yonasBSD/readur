@@ -297,7 +297,9 @@ async fn process_file(
     
     let saved_file_path = file_service.save_file(&filename, &file_data).await?;
     
-    let system_user_id = uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000000")?;
+    // TODO: Make this configurable or fetch from database
+    // Using admin user ID for watch folder documents
+    let system_user_id = uuid::Uuid::parse_str("c2e66705-e54b-4eff-91f5-760cb0a69b62")?;
     
     let document = file_service.create_document(
         &filename,

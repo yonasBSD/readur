@@ -6,7 +6,7 @@ use axum::{
 };
 use sqlx::Row;
 use std::sync::Arc;
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use tower_http::{cors::CorsLayer, services::{ServeDir, ServeFile}};
 use tracing::{info, error};
 
 mod auth;
@@ -146,7 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api/users", routes::users::router())
         .nest("/api/webdav", routes::webdav::router())
         .merge(swagger::create_swagger_router())
-        .nest_service("/", ServeDir::new("/app/frontend"))
+        .nest_service("/", ServeDir::new("/app/frontend").fallback(ServeFile::new("/app/frontend/index.html")))
         .fallback(serve_spa)
         .layer(CorsLayer::permissive())
         .with_state(Arc::new(state));

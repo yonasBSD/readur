@@ -12,7 +12,7 @@ use tokio::time::sleep;
 
 use readur::models::{DocumentResponse, CreateUser, LoginRequest, LoginResponse};
 
-const BASE_URL: &str = "http://localhost:8080";
+const BASE_URL: &str = "http://localhost:8000";
 const TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Integration test client that handles authentication and common operations
