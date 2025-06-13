@@ -189,46 +189,8 @@ impl EnhancedOcrService {
         // Note: set_engine_mode may not be available in the current tesseract crate version
         // We'll configure this differently if needed
         
-        // Set DPI if specified and different from 0
-        if settings.ocr_dpi > 0 {
-            tesseract = tesseract.set_variable("user_defined_dpi", &settings.ocr_dpi.to_string())?;
-        }
-        
-        // Configure character whitelist/blacklist
-        if let Some(ref whitelist) = settings.ocr_whitelist_chars {
-            if !whitelist.is_empty() {
-                tesseract = tesseract.set_variable("tessedit_char_whitelist", whitelist)?;
-            }
-        }
-        
-        if let Some(ref blacklist) = settings.ocr_blacklist_chars {
-            if !blacklist.is_empty() {
-                tesseract = tesseract.set_variable("tessedit_char_blacklist", blacklist)?;
-            }
-        }
-        
-        // Additional high-quality settings for challenging images
-        tesseract = tesseract.set_variable("preserve_interword_spaces", "1")?;
-        tesseract = tesseract.set_variable("tessedit_do_invert", "0")?;
-        tesseract = tesseract.set_variable("classify_enable_learning", "0")?;
-        tesseract = tesseract.set_variable("textord_really_old_xheight", "1")?;
-        tesseract = tesseract.set_variable("textord_min_xheight", "7")?;
-        
-        // Enhanced settings for low-quality images
-        tesseract = tesseract.set_variable("tessedit_char_unblacklist_fraction", "0.0")?;
-        tesseract = tesseract.set_variable("edges_max_children_per_outline", "40")?;
-        tesseract = tesseract.set_variable("textord_noise_sizefraction", "10.0")?;
-        tesseract = tesseract.set_variable("textord_noise_translimit", "16.0")?;
-        tesseract = tesseract.set_variable("textord_noise_normratio", "2.0")?;
-        
-        // Improve word breaking for dense text
-        tesseract = tesseract.set_variable("textord_tabfind_find_tables", "1")?;
-        tesseract = tesseract.set_variable("textord_use_cjk_fp_model", "0")?;
-        
-        // Better handling of degraded images
-        tesseract = tesseract.set_variable("classify_adapt_feature_threshold", "230")?;
-        tesseract = tesseract.set_variable("classify_adapt_proto_threshold", "230")?;
-        tesseract = tesseract.set_variable("textord_heavy_nr", "1")?;
+        // Basic configuration - skip advanced settings that might cause issues
+        // Only set essential variables that are widely supported
         
         Ok(tesseract)
     }
