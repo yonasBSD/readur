@@ -86,7 +86,7 @@ describe('GlobalSearchBar', () => {
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
-  test('shows search suggestions when input is focused', async () => {
+  test('shows popular searches when input is focused', async () => {
     renderWithRouter(<GlobalSearchBar />);
     
     const searchInput = screen.getByPlaceholderText('Search documents...');
@@ -97,6 +97,7 @@ describe('GlobalSearchBar', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Start typing to search documents')).toBeInTheDocument();
+      expect(screen.getByText('Popular searches:')).toBeInTheDocument();
       expect(screen.getByText('invoice')).toBeInTheDocument();
       expect(screen.getByText('contract')).toBeInTheDocument();
       expect(screen.getByText('report')).toBeInTheDocument();
@@ -135,6 +136,7 @@ describe('GlobalSearchBar', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Quick Results')).toBeInTheDocument();
+      expect(screen.getByText('2 found')).toBeInTheDocument(); // Enhanced result count display
       expect(screen.getByText('test.pdf')).toBeInTheDocument();
       expect(screen.getByText('image.png')).toBeInTheDocument();
     });
@@ -408,5 +410,56 @@ describe('GlobalSearchBar', () => {
     await waitFor(() => {
       expect(screen.queryByText('Quick Results')).not.toBeInTheDocument();
     });
+  });
+
+  // New tests for enhanced functionality
+  test('shows typing indicator while user is typing', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<GlobalSearchBar />);
+    
+    const searchInput = screen.getByPlaceholderText('Search documents...');
+    
+    await act(async () => {
+      await user.type(searchInput, 't', { delay: 50 });
+    });
+
+    // Should show typing indicator
+    expect(screen.getAllByRole('progressbar').length).toBeGreaterThan(0);
+  });
+  
+  test('shows smart suggestions while typing', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<GlobalSearchBar />);
+    
+    const searchInput = screen.getByPlaceholderText('Search documents...');
+    
+    await act(async () => {
+      await user.type(searchInput, 'inv');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Try these suggestions:')).toBeInTheDocument();
+    });
+  });
+  
+  test('popular search chips are clickable', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<GlobalSearchBar />);
+    
+    const searchInput = screen.getByPlaceholderText('Search documents...');
+    
+    await act(async () => {
+      searchInput.focus();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('invoice')).toBeInTheDocument();
+    });
+
+    const invoiceChip = screen.getByText('invoice');
+    await user.click(invoiceChip);
+
+    expect(searchInput.value).toBe('invoice');
+    expect(mockNavigate).toHaveBeenCalledWith('/search?q=invoice');
   });
 });

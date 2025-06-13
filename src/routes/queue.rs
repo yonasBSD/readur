@@ -2,7 +2,7 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::Json,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use std::sync::Arc;
@@ -15,6 +15,18 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/requeue-failed", post(requeue_failed))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/queue/stats",
+    tag = "queue",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "OCR queue statistics"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn get_queue_stats(
     State(state): State<Arc<AppState>>,
     _auth_user: AuthUser, // Require authentication
@@ -40,8 +52,18 @@ async fn get_queue_stats(
     })))
 }
 
-use axum::routing::post;
-
+#[utoipa::path(
+    post,
+    path = "/api/queue/requeue-failed",
+    tag = "queue",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "Failed items requeued successfully"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn requeue_failed(
     State(state): State<Arc<AppState>>,
     _auth_user: AuthUser, // Require authentication

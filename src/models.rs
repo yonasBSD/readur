@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
-use utoipa::ToSchema;
+use utoipa::{ToSchema, IntoParams};
 
 #[derive(Debug, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct User {
@@ -68,7 +68,7 @@ pub struct DocumentResponse {
     pub has_ocr_text: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, IntoParams)]
 pub struct SearchRequest {
     pub query: String,
     pub tags: Option<Vec<String>>,

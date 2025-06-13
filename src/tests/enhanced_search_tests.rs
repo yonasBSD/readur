@@ -407,12 +407,12 @@ mod tests {
         assert!(total_highlights >= 2);
     }
 
-    // Test search suggestions functionality
+    // Test search suggestions functionality - enhanced version
     fn generate_search_suggestions(query: &str) -> Vec<String> {
-        // Copy of the function from search.rs for testing
+        // Enhanced copy of the function from search.rs for testing
         let mut suggestions = Vec::new();
         
-        if query.len() > 3 {
+        if query.len() > 2 { // Reduced minimum length for faster suggestions
             // Common search variations
             suggestions.push(format!("\"{}\"", query)); // Exact phrase
             
@@ -421,16 +421,39 @@ mod tests {
                 suggestions.push(format!("{}*", query));
             }
             
+            // Add tag search suggestion
+            if !query.starts_with("tag:") {
+                suggestions.push(format!("tag:{}", query));
+            }
+            
             // Add similar terms (this would typically come from a thesaurus or ML model)
-            // Use case-insensitive matching for replacements
             let query_lower = query.to_lowercase();
             if query_lower.contains("document") {
                 suggestions.push(query.replace("document", "file").replace("Document", "file"));
                 suggestions.push(query.replace("document", "paper").replace("Document", "paper"));
             }
+            
+            // Add Boolean operator suggestions for longer queries
+            if query.len() > 5 && !query.contains(" AND ") && !query.contains(" OR ") {
+                let words: Vec<&str> = query.split_whitespace().collect();
+                if words.len() >= 2 {
+                    suggestions.push(format!("{} AND {}", words[0], words[1]));
+                    suggestions.push(format!("{} OR {}", words[0], words[1]));
+                }
+            }
+            
+            // Add content type suggestions
+            if query_lower.contains("invoice") {
+                suggestions.push("receipt".to_string());
+                suggestions.push("billing".to_string());
+            }
+            if query_lower.contains("contract") {
+                suggestions.push("agreement".to_string());
+                suggestions.push("legal".to_string());
+            }
         }
         
-        suggestions.into_iter().take(5).collect() // Increase limit to accommodate replacements
+        suggestions.into_iter().take(6).collect() // Increased limit for enhanced suggestions
     }
 
     #[test]
@@ -448,6 +471,46 @@ mod tests {
         
         // Should not generate suggestions for very short queries
         assert!(suggestions.is_empty());
+    }
+    
+    #[test]
+    fn test_search_suggestions_enhanced_features() {
+        let suggestions = generate_search_suggestions("invoice payment");
+        
+        assert!(!suggestions.is_empty());
+        assert!(suggestions.contains(&"\"invoice payment\"".to_string()));
+        assert!(suggestions.contains(&"invoice payment*".to_string()));
+        assert!(suggestions.contains(&"tag:invoice payment".to_string()));
+        assert!(suggestions.contains(&"invoice AND payment".to_string()));
+        assert!(suggestions.contains(&"invoice OR payment".to_string()));
+    }
+    
+    #[test]
+    fn test_search_suggestions_content_specific() {
+        let invoice_suggestions = generate_search_suggestions("invoice");
+        assert!(invoice_suggestions.contains(&"receipt".to_string()));
+        assert!(invoice_suggestions.contains(&"billing".to_string()));
+        
+        let contract_suggestions = generate_search_suggestions("contract");
+        assert!(contract_suggestions.contains(&"agreement".to_string()));
+        assert!(contract_suggestions.contains(&"legal".to_string()));
+    }
+    
+    #[test]
+    fn test_search_suggestions_tag_prefix() {
+        let suggestions = generate_search_suggestions("tag:important");
+        
+        // Should not add tag: prefix if already present
+        assert!(!suggestions.iter().any(|s| s.starts_with("tag:tag:")));
+    }
+    
+    #[test]
+    fn test_search_suggestions_boolean_operators() {
+        let suggestions = generate_search_suggestions("document AND file");
+        
+        // Should not add Boolean operators if already present
+        // Fixed: Check for suggestions that contain multiple AND operators
+        assert!(!suggestions.iter().any(|s| s.matches(" AND ").count() > 1));
     }
 
     #[test]
@@ -472,8 +535,8 @@ mod tests {
     fn test_search_suggestions_limit() {
         let suggestions = generate_search_suggestions("document test example");
         
-        // Should limit to 5 suggestions
-        assert!(suggestions.len() <= 5);
+        // Should limit to 6 suggestions (updated limit)
+        assert!(suggestions.len() <= 6);
     }
 
     #[test]

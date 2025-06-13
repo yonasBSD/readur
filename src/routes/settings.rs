@@ -6,7 +6,6 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use utoipa::path;
 
 use crate::{
     auth::AuthUser,
@@ -19,6 +18,18 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/", get(get_settings).put(update_settings))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/settings",
+    tag = "settings",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "User settings", body = SettingsResponse),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn get_settings(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -57,6 +68,20 @@ async fn get_settings(
     Ok(Json(response))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/settings",
+    tag = "settings",
+    security(
+        ("bearer_auth" = [])
+    ),
+    request_body = UpdateSettings,
+    responses(
+        (status = 200, description = "Settings updated successfully", body = SettingsResponse),
+        (status = 400, description = "Bad request - invalid settings data"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn update_settings(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,

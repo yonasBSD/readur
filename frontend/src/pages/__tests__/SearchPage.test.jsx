@@ -14,6 +14,20 @@ jest.mock('../../services/api', () => ({
   }
 }));
 
+// Mock SearchGuidance component
+jest.mock('../../components/SearchGuidance', () => {
+  return function MockSearchGuidance({ onExampleClick, compact }) {
+    return (
+      <div data-testid="search-guidance">
+        <button onClick={() => onExampleClick?.('test query')}>
+          Mock Guidance Example
+        </button>
+        {compact && <span>Compact Mode</span>}
+      </div>
+    );
+  };
+});
+
 // Mock useNavigate
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
@@ -49,7 +63,7 @@ const mockSearchResponse = {
     ],
     total: 1,
     query_time_ms: 45,
-    suggestions: ['\"test\"', 'test*']
+    suggestions: ['\"test\"', 'test*', 'tag:test']
   }
 };
 
@@ -77,9 +91,10 @@ describe('SearchPage', () => {
     expect(screen.getByText('Start searching your documents')).toBeInTheDocument();
   });
 
-  test('displays search suggestions when no query is entered', () => {
+  test('displays search tips and examples when no query is entered', () => {
     renderWithRouter(<SearchPage />);
     
+    expect(screen.getByText('Search Tips:')).toBeInTheDocument();
     expect(screen.getByText('Try: invoice')).toBeInTheDocument();
     expect(screen.getByText('Try: contract')).toBeInTheDocument();
     expect(screen.getByText('Try: tag:important')).toBeInTheDocument();
@@ -126,7 +141,7 @@ describe('SearchPage', () => {
     });
   });
 
-  test('shows search suggestions when available', async () => {
+  test('shows quick suggestions while typing', async () => {
     const user = userEvent.setup();
     renderWithRouter(<SearchPage />);
     
@@ -137,13 +152,29 @@ describe('SearchPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Suggestions:')).toBeInTheDocument();
+      expect(screen.getByText('Quick suggestions:')).toBeInTheDocument();
+    });
+  });
+  
+  test('shows server suggestions from search results', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SearchPage />);
+    
+    const searchInput = screen.getByPlaceholderText(/Search documents by content, filename, or tags/);
+    
+    await act(async () => {
+      await user.type(searchInput, 'test');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Related searches:')).toBeInTheDocument();
       expect(screen.getByText('\"test\"')).toBeInTheDocument();
       expect(screen.getByText('test*')).toBeInTheDocument();
+      expect(screen.getByText('tag:test')).toBeInTheDocument();
     });
   });
 
-  test('toggles advanced search options', async () => {
+  test('toggles advanced search options with guidance', async () => {
     const user = userEvent.setup();
     renderWithRouter(<SearchPage />);
     
@@ -154,9 +185,11 @@ describe('SearchPage', () => {
     expect(screen.getByText('Search Options')).toBeInTheDocument();
     expect(screen.getByText('Enhanced Search')).toBeInTheDocument();
     expect(screen.getByText('Show Snippets')).toBeInTheDocument();
+    expect(screen.getByTestId('search-guidance')).toBeInTheDocument();
+    expect(screen.getByText('Compact Mode')).toBeInTheDocument();
   });
 
-  test('changes search mode', async () => {
+  test('changes search mode with simplified labels', async () => {
     const user = userEvent.setup();
     renderWithRouter(<SearchPage />);
     
@@ -167,11 +200,11 @@ describe('SearchPage', () => {
     });
 
     await waitFor(() => {
-      const phraseButton = screen.getByRole('button', { name: 'Phrase' });
+      const phraseButton = screen.getByRole('button', { name: 'Exact phrase' });
       expect(phraseButton).toBeInTheDocument();
     });
 
-    const phraseButton = screen.getByRole('button', { name: 'Phrase' });
+    const phraseButton = screen.getByRole('button', { name: 'Exact phrase' });
     await user.click(phraseButton);
 
     // Wait for search to be called with new mode
@@ -181,6 +214,23 @@ describe('SearchPage', () => {
           search_mode: 'phrase'
         })
       );
+    });
+  });
+  
+  test('displays simplified search mode labels', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SearchPage />);
+    
+    const searchInput = screen.getByPlaceholderText(/Search documents by content, filename, or tags/);
+    await act(async () => {
+      await user.type(searchInput, 'test');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Smart' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Exact phrase' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Similar words' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Advanced' })).toBeInTheDocument();
     });
   });
 
@@ -195,7 +245,7 @@ describe('SearchPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('\"test\"')).toBeInTheDocument();
+      expect(screen.getByText('Related searches:')).toBeInTheDocument();
     });
 
     const suggestionChip = screen.getByText('\"test\"');
@@ -272,12 +322,12 @@ describe('SearchPage', () => {
     });
   });
 
-  test('displays loading state during search', async () => {
+  test('displays enhanced loading state with progress during search', async () => {
     const user = userEvent.setup();
     
     // Mock a delayed response
     documentService.enhancedSearch.mockImplementation(() => 
-      new Promise(resolve => setTimeout(() => resolve(mockSearchResponse), 100))
+      new Promise(resolve => setTimeout(() => resolve(mockSearchResponse), 200))
     );
     
     renderWithRouter(<SearchPage />);
@@ -285,15 +335,15 @@ describe('SearchPage', () => {
     const searchInput = screen.getByPlaceholderText(/Search documents by content, filename, or tags/);
     
     await act(async () => {
-      await user.type(searchInput, 'test');
+      await user.type(searchInput, 't');
     });
 
-    // Should show loading indicator
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    // Should show loading indicators
+    expect(screen.getAllByRole('progressbar').length).toBeGreaterThan(0);
     
     await waitFor(() => {
       expect(screen.getByText('test.pdf')).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
   });
 
   test('handles search error gracefully', async () => {
@@ -445,16 +495,106 @@ describe('SearchPage', () => {
   });
 });
 
-// Test helper functions
-describe('Search Helper Functions', () => {
-  test('formats file sizes correctly', () => {
-    // These would test utility functions if they were exported
-    // For now, we test the component behavior
-    expect(true).toBe(true);
-  });
+// New functionality tests
+describe('Enhanced Search Features', () => {
+  test('shows typing indicator while user is typing', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SearchPage />);
+    
+    const searchInput = screen.getByPlaceholderText(/Search documents by content, filename, or tags/);
+    
+    // Start typing without completing
+    await act(async () => {
+      await user.type(searchInput, 't', { delay: 50 });
+    });
 
-  test('formats dates correctly', () => {
-    // These would test utility functions if they were exported
-    expect(true).toBe(true);
+    // Should show typing indicator
+    expect(screen.getAllByRole('progressbar').length).toBeGreaterThan(0);
+  });
+  
+  test('shows improved no results state with suggestions', async () => {
+    const user = userEvent.setup();
+    
+    // Mock empty response
+    documentService.enhancedSearch.mockResolvedValue({
+      data: {
+        documents: [],
+        total: 0,
+        query_time_ms: 10,
+        suggestions: []
+      }
+    });
+    
+    renderWithRouter(<SearchPage />);
+    
+    const searchInput = screen.getByPlaceholderText(/Search documents by content, filename, or tags/);
+    
+    await act(async () => {
+      await user.type(searchInput, 'nonexistent');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/No results found for "nonexistent"/)).toBeInTheDocument();
+      expect(screen.getByText('Suggestions:')).toBeInTheDocument();
+      expect(screen.getByText('• Try simpler or more general terms')).toBeInTheDocument();
+    });
+  });
+  
+  test('clickable example chips in empty state work correctly', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SearchPage />);
+    
+    const invoiceChip = screen.getByText('Try: invoice');
+    await user.click(invoiceChip);
+    
+    const searchInput = screen.getByPlaceholderText(/Search documents by content, filename, or tags/);
+    expect(searchInput.value).toBe('invoice');
+  });
+  
+  test('search guidance example click works', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SearchPage />);
+    
+    const settingsButton = screen.getByRole('button', { name: /settings/i });
+    await user.click(settingsButton);
+    
+    const guidanceExample = screen.getByText('Mock Guidance Example');
+    await user.click(guidanceExample);
+    
+    const searchInput = screen.getByPlaceholderText(/Search documents by content, filename, or tags/);
+    expect(searchInput.value).toBe('test query');
+  });
+  
+  test('mobile filter toggle works', async () => {
+    const user = userEvent.setup();
+    
+    // Mock mobile viewport
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 500,
+    });
+    
+    renderWithRouter(<SearchPage />);
+    
+    // Mobile filter button should be visible
+    const mobileFilterButton = screen.getByTestId('FilterIcon');
+    expect(mobileFilterButton).toBeInTheDocument();
+  });
+  
+  test('search results have enhanced CSS classes for styling', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SearchPage />);
+    
+    const searchInput = screen.getByPlaceholderText(/Search documents by content, filename, or tags/);
+    
+    await act(async () => {
+      await user.type(searchInput, 'test');
+    });
+
+    await waitFor(() => {
+      const resultCard = screen.getByText('test.pdf').closest('[class*="search-result-card"]');
+      expect(resultCard).toBeInTheDocument();
+    });
   });
 });

@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::Json,
-    routing::get,
+    routing::{get, post, put, delete},
     Router,
 };
 use std::sync::Arc;
@@ -20,6 +20,18 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/:id", get(get_user).put(update_user).delete(delete_user))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/users",
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "List of all users", body = Vec<UserResponse>),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn list_users(
     _auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -34,6 +46,22 @@ async fn list_users(
     Ok(Json(user_responses))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/users/{id}",
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        ("id" = Uuid, Path, description = "User ID")
+    ),
+    responses(
+        (status = 200, description = "User information", body = UserResponse),
+        (status = 404, description = "User not found"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn get_user(
     _auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -49,6 +77,20 @@ async fn get_user(
     Ok(Json(user.into()))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/users",
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    ),
+    request_body = CreateUser,
+    responses(
+        (status = 200, description = "User created successfully", body = UserResponse),
+        (status = 400, description = "Bad request - invalid user data"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn create_user(
     _auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -63,6 +105,23 @@ async fn create_user(
     Ok(Json(user.into()))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/users/{id}",
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        ("id" = Uuid, Path, description = "User ID")
+    ),
+    request_body = UpdateUser,
+    responses(
+        (status = 200, description = "User updated successfully", body = UserResponse),
+        (status = 400, description = "Bad request - invalid user data"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn update_user(
     _auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -78,6 +137,22 @@ async fn update_user(
     Ok(Json(user.into()))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/users/{id}",
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        ("id" = Uuid, Path, description = "User ID")
+    ),
+    responses(
+        (status = 204, description = "User deleted successfully"),
+        (status = 403, description = "Forbidden - cannot delete yourself"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn delete_user(
     auth_user: AuthUser,
     State(state): State<Arc<AppState>>,
