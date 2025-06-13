@@ -28,6 +28,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/", post(upload_document))
         .route("/", get(list_documents))
         .route("/:id/download", get(download_document))
+        .route("/:id/ocr", get(get_document_ocr))
 }
 
 #[utoipa::path(
@@ -209,4 +210,52 @@ async fn download_document(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     
     Ok(file_data)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/documents/{id}/ocr",
+    tag = "documents",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        ("id" = uuid::Uuid, Path, description = "Document ID")
+    ),
+    responses(
+        (status = 200, description = "OCR extracted text and metadata", body = String),
+        (status = 404, description = "Document not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+async fn get_document_ocr(
+    State(state): State<Arc<AppState>>,
+    auth_user: AuthUser,
+    Path(document_id): Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let documents = state
+        .db
+        .get_documents_by_user(auth_user.user.id, 1000, 0)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    
+    let document = documents
+        .into_iter()
+        .find(|doc| doc.id == document_id)
+        .ok_or(StatusCode::NOT_FOUND)?;
+    
+    // Return OCR text and metadata
+    Ok(Json(serde_json::json!({
+        "document_id": document.id,
+        "filename": document.filename,
+        "has_ocr_text": document.ocr_text.is_some(),
+        "ocr_text": document.ocr_text,
+        "ocr_confidence": document.ocr_confidence,
+        "ocr_word_count": document.ocr_word_count,
+        "ocr_processing_time_ms": document.ocr_processing_time_ms,
+        "ocr_status": document.ocr_status,
+        "ocr_error": document.ocr_error,
+        "ocr_completed_at": document.ocr_completed_at
+    })))
 }
