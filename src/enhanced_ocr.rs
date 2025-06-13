@@ -504,16 +504,21 @@ impl EnhancedOcrService {
         
         let bytes = std::fs::read(file_path)?;
         
-        // Validate PDF header
-        if bytes.len() < 5 || !bytes.starts_with(b"%PDF-") {
+        // Check if it's a valid PDF (handles leading null bytes)
+        if !is_valid_pdf(&bytes) {
             return Err(anyhow!(
                 "Invalid PDF file: Missing or corrupted PDF header. File size: {} bytes, Header: {:?}", 
                 bytes.len(),
-                bytes.get(0..20).unwrap_or(&[]).iter().map(|&b| b as char).collect::<String>()
+                bytes.get(0..50).unwrap_or(&[]).iter().map(|&b| {
+                    if b >= 32 && b <= 126 { b as char } else { '.' }
+                }).collect::<String>()
             ));
         }
         
-        let text = match pdf_extract::extract_text_from_mem(&bytes) {
+        // Clean the PDF data (remove leading null bytes)
+        let clean_bytes = clean_pdf_data(&bytes);
+        
+        let text = match pdf_extract::extract_text_from_mem(&clean_bytes) {
             Ok(text) => text,
             Err(e) => {
                 // Provide more detailed error information
@@ -631,4 +636,45 @@ impl EnhancedOcrService {
     pub fn validate_ocr_quality(&self, _result: &OcrResult, _settings: &Settings) -> bool {
         false
     }
+}
+
+/// Check if the given bytes represent a valid PDF file
+/// Handles PDFs with leading null bytes or whitespace
+fn is_valid_pdf(data: &[u8]) -> bool {
+    if data.len() < 5 {
+        return false;
+    }
+    
+    // Find the first occurrence of "%PDF-" in the first 1KB of the file
+    // Some PDFs have leading null bytes or other metadata
+    let search_limit = data.len().min(1024);
+    let search_data = &data[0..search_limit];
+    
+    for i in 0..=search_limit.saturating_sub(5) {
+        if &search_data[i..i+5] == b"%PDF-" {
+            return true;
+        }
+    }
+    
+    false
+}
+
+/// Remove leading null bytes and return clean PDF data
+/// Returns the original data if no PDF header is found
+fn clean_pdf_data(data: &[u8]) -> Vec<u8> {
+    if data.len() < 5 {
+        return data.to_vec();
+    }
+    
+    // Find the first occurrence of "%PDF-" in the first 1KB
+    let search_limit = data.len().min(1024);
+    
+    for i in 0..=search_limit.saturating_sub(5) {
+        if &data[i..i+5] == b"%PDF-" {
+            return data[i..].to_vec();
+        }
+    }
+    
+    // If no PDF header found, return original data
+    data.to_vec()
 }

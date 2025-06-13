@@ -125,6 +125,14 @@ impl Database {
                 ocr_detect_orientation BOOLEAN DEFAULT TRUE,
                 ocr_whitelist_chars TEXT,
                 ocr_blacklist_chars TEXT,
+                webdav_enabled BOOLEAN DEFAULT FALSE,
+                webdav_server_url TEXT,
+                webdav_username TEXT,
+                webdav_password TEXT,
+                webdav_watch_folders TEXT[] DEFAULT ARRAY['/Documents']::TEXT[],
+                webdav_file_extensions TEXT[] DEFAULT ARRAY['pdf', 'png', 'jpg', 'jpeg', 'tiff', 'bmp', 'txt']::TEXT[],
+                webdav_auto_sync BOOLEAN DEFAULT FALSE,
+                webdav_sync_interval_minutes INTEGER DEFAULT 60,
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             )
@@ -939,6 +947,8 @@ impl Database {
                cpu_priority, enable_background_ocr, ocr_page_segmentation_mode, ocr_engine_mode,
                ocr_min_confidence, ocr_dpi, ocr_enhance_contrast, ocr_remove_noise,
                ocr_detect_orientation, ocr_whitelist_chars, ocr_blacklist_chars,
+               webdav_enabled, webdav_server_url, webdav_username, webdav_password,
+               webdav_watch_folders, webdav_file_extensions, webdav_auto_sync, webdav_sync_interval_minutes,
                created_at, updated_at
                FROM settings WHERE user_id = $1"#
         )

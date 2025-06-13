@@ -297,12 +297,14 @@ async fn process_file(
     
     // Validate PDF files before processing
     if mime_type == "application/pdf" {
-        if file_data.len() < 5 || !file_data.starts_with(b"%PDF-") {
+        if !is_valid_pdf(&file_data) {
             warn!(
                 "Skipping invalid PDF file: {} (size: {} bytes, header: {:?})",
                 filename,
                 file_data.len(),
-                file_data.get(0..20).unwrap_or(&[]).iter().map(|&b| b as char).collect::<String>()
+                file_data.get(0..50).unwrap_or(&[]).iter().map(|&b| {
+                    if b >= 32 && b <= 126 { b as char } else { '.' }
+                }).collect::<String>()
             );
             return Ok(());
         }
@@ -369,4 +371,45 @@ fn calculate_priority(file_size: i64, mime_type: &str) -> i32 {
     };
     
     (base_priority + type_boost).min(10)
+}
+
+/// Check if the given bytes represent a valid PDF file
+/// Handles PDFs with leading null bytes or whitespace
+fn is_valid_pdf(data: &[u8]) -> bool {
+    if data.len() < 5 {
+        return false;
+    }
+    
+    // Find the first occurrence of "%PDF-" in the first 1KB of the file
+    // Some PDFs have leading null bytes or other metadata
+    let search_limit = data.len().min(1024);
+    let search_data = &data[0..search_limit];
+    
+    for i in 0..=search_limit.saturating_sub(5) {
+        if &search_data[i..i+5] == b"%PDF-" {
+            return true;
+        }
+    }
+    
+    false
+}
+
+/// Remove leading null bytes and return clean PDF data
+/// Returns the original data if no PDF header is found
+fn clean_pdf_data(data: &[u8]) -> &[u8] {
+    if data.len() < 5 {
+        return data;
+    }
+    
+    // Find the first occurrence of "%PDF-" in the first 1KB
+    let search_limit = data.len().min(1024);
+    
+    for i in 0..=search_limit.saturating_sub(5) {
+        if &data[i..i+5] == b"%PDF-" {
+            return &data[i..];
+        }
+    }
+    
+    // If no PDF header found, return original data
+    data
 }

@@ -1,21 +1,6 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { vi } from 'vitest'
-import { BrowserRouter } from 'react-router-dom'
+import { screen, fireEvent, waitFor, vi } from '@testing-library/react'
+import { renderWithMockAuth } from '../../test/test-utils'
 import Login from '../Login'
-
-// Mock the auth context
-const mockLogin = vi.fn()
-
-vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({
-    login: mockLogin,
-    user: null,
-    loading: false,
-    register: vi.fn(),
-    logout: vi.fn(),
-  }),
-  AuthProvider: ({ children }: any) => <>{children}</>,
-}))
 
 // Mock the API service
 vi.mock('../../services/api', () => ({
@@ -26,11 +11,7 @@ vi.mock('../../services/api', () => ({
   },
 }))
 
-const LoginWrapper = ({ children }: { children: React.ReactNode }) => (
-  <BrowserRouter>
-    {children}
-  </BrowserRouter>
-)
+const mockLogin = vi.fn()
 
 describe('Login', () => {
   beforeEach(() => {
@@ -38,11 +19,7 @@ describe('Login', () => {
   })
 
   test('renders login form', () => {
-    render(
-      <LoginWrapper>
-        <Login />
-      </LoginWrapper>
-    )
+    renderWithMockAuth(<Login />, { login: mockLogin })
 
     expect(screen.getByText('Sign in to Readur')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Username')).toBeInTheDocument()
@@ -54,11 +31,7 @@ describe('Login', () => {
   test('handles form submission with valid credentials', async () => {
     mockLogin.mockResolvedValue(undefined)
 
-    render(
-      <LoginWrapper>
-        <Login />
-      </LoginWrapper>
-    )
+    renderWithMockAuth(<Login />, { login: mockLogin })
 
     const usernameInput = screen.getByPlaceholderText('Username')
     const passwordInput = screen.getByPlaceholderText('Password')
@@ -79,11 +52,7 @@ describe('Login', () => {
       response: { data: { message: errorMessage } },
     })
 
-    render(
-      <LoginWrapper>
-        <Login />
-      </LoginWrapper>
-    )
+    renderWithMockAuth(<Login />, { login: mockLogin })
 
     const usernameInput = screen.getByPlaceholderText('Username')
     const passwordInput = screen.getByPlaceholderText('Password')
@@ -101,11 +70,7 @@ describe('Login', () => {
   test('shows loading state during submission', async () => {
     mockLogin.mockImplementation(() => new Promise(() => {})) // Never resolves
 
-    render(
-      <LoginWrapper>
-        <Login />
-      </LoginWrapper>
-    )
+    renderWithMockAuth(<Login />, { login: mockLogin })
 
     const usernameInput = screen.getByPlaceholderText('Username')
     const passwordInput = screen.getByPlaceholderText('Password')
@@ -122,11 +87,7 @@ describe('Login', () => {
   })
 
   test('requires username and password', () => {
-    render(
-      <LoginWrapper>
-        <Login />
-      </LoginWrapper>
-    )
+    renderWithMockAuth(<Login />, { login: mockLogin })
 
     const usernameInput = screen.getByPlaceholderText('Username')
     const passwordInput = screen.getByPlaceholderText('Password')
