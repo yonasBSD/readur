@@ -444,12 +444,15 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                 sx={{
                   mt: 1,
                   maxHeight: 420,
-                  overflow: 'auto',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
                   background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 100%)',
                   backdropFilter: 'blur(24px)',
                   border: '1px solid rgba(226,232,240,0.6)',
                   borderRadius: 3,
                   boxShadow: '0 20px 60px rgba(0,0,0,0.12), 0 8px 25px rgba(0,0,0,0.08)',
+                  width: '100%',
+                  minWidth: 0,
                 }}
               >
                 {(loading || isTyping) && (
@@ -610,6 +613,8 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                             cursor: 'pointer',
                             borderRadius: 2,
                             mx: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
                             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             '&:hover': {
                               background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%)',
@@ -629,6 +634,10 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
+                                  maxWidth: '100%',
+                                  width: 0,
+                                  minWidth: 0,
+                                  flex: 1,
                                 }}
                               >
                                 {highlightText(generateContextSnippet(doc.original_filename, query), query)}
@@ -673,6 +682,10 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                                       whiteSpace: 'nowrap',
                                       fontSize: '0.7rem',
                                       fontStyle: 'italic',
+                                      maxWidth: '100%',
+                                      width: 0,
+                                      minWidth: 0,
+                                      flex: 1,
                                     }}
                                   >
                                     {highlightText(doc.snippets[0].text.substring(0, 80) + '...', query)}
@@ -764,6 +777,8 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                             cursor: 'pointer',
                             borderRadius: 2,
                             mx: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
                             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             '&:hover': {
                               background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%)',
@@ -777,7 +792,18 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                           </ListItemIcon>
                           <ListItemText
                             primary={
-                              <Typography variant="body2">
+                              <Typography 
+                                variant="body2"
+                                sx={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  maxWidth: '100%',
+                                  width: 0,
+                                  minWidth: 0,
+                                  flex: 1,
+                                }}
+                              >
                                 {search}
                               </Typography>
                             }
