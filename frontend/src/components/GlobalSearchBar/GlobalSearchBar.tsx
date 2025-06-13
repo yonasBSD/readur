@@ -375,19 +375,36 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
               ),
             }}
             sx={{
-              minWidth: 300,
-              maxWidth: 400,
+              minWidth: 320,
+              maxWidth: 420,
               '& .MuiOutlinedInput-root': {
-                backgroundColor: 'background.paper',
-                transition: 'all 0.2s ease-in-out',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.90) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(226,232,240,0.5)',
+                borderRadius: 3,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
                 '&:hover': {
-                  backgroundColor: 'background.paper',
-                  borderColor: 'primary.main',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 100%)',
+                  borderColor: 'rgba(99,102,241,0.4)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 32px rgba(99,102,241,0.15)',
                 },
                 '&.Mui-focused': {
-                  backgroundColor: 'background.paper',
-                  borderColor: 'primary.main',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(248,250,252,0.98) 100%)',
+                  borderColor: '#6366f1',
                   borderWidth: 2,
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 12px 40px rgba(99,102,241,0.2)',
+                },
+                '& .MuiInputBase-input': {
+                  fontWeight: 500,
+                  letterSpacing: '0.025em',
+                  fontSize: '0.95rem',
+                  '&::placeholder': {
+                    color: 'rgba(148,163,184,0.8)',
+                    fontWeight: 400,
+                  },
                 },
               },
             }}
@@ -423,20 +440,40 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
           {({ TransitionProps }) => (
             <Grow {...TransitionProps}>
               <Paper
-                elevation={8}
+                elevation={0}
                 sx={{
                   mt: 1,
-                  maxHeight: 400,
+                  maxHeight: 420,
                   overflow: 'auto',
-                  border: '1px solid',
-                  borderColor: 'divider',
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 100%)',
+                  backdropFilter: 'blur(24px)',
+                  border: '1px solid rgba(226,232,240,0.6)',
+                  borderRadius: 3,
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.12), 0 8px 25px rgba(0,0,0,0.08)',
                 }}
               >
                 {(loading || isTyping) && (
-                  <Box sx={{ p: 2, textAlign: 'center' }}>
-                    <Stack spacing={1} alignItems="center">
-                      <CircularProgress size={20} />
-                      <Typography variant="body2" color="text.secondary">
+                  <Box sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.02) 0%, rgba(139,92,246,0.02) 100%)',
+                  }}>
+                    <Stack spacing={1.5} alignItems="center">
+                      <Box sx={{
+                        p: 1.5,
+                        borderRadius: 2,
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <CircularProgress size={20} thickness={4} sx={{ color: '#6366f1' }} />
+                      </Box>
+                      <Typography variant="body2" sx={{ 
+                        color: 'text.secondary',
+                        fontWeight: 500,
+                        letterSpacing: '0.025em',
+                      }}>
                         {isTyping ? 'Searching as you type...' : 'Searching...'}
                       </Typography>
                     </Stack>
@@ -461,18 +498,40 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                 )}
 
                 {!loading && !isTyping && query && results.length === 0 && (
-                  <Box sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <Box sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.02) 0%, rgba(139,92,246,0.02) 100%)',
+                  }}>
+                    <Typography variant="body2" sx={{
+                      color: 'text.secondary',
+                      fontWeight: 500,
+                      letterSpacing: '0.025em',
+                      mb: 1,
+                    }}>
                       No documents found for "{query}"
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                    <Typography variant="caption" sx={{
+                      color: 'text.secondary',
+                      fontWeight: 500,
+                      mb: 2,
+                      display: 'block',
+                    }}>
                       Press Enter to search with advanced options
                     </Typography>
                     
                     {/* Smart suggestions for no results */}
                     {suggestions.length > 0 && (
                       <>
-                        <Typography variant="caption" color="text.primary" gutterBottom sx={{ display: 'block' }}>
+                        <Typography variant="caption" sx={{
+                          color: 'text.primary',
+                          fontWeight: 600,
+                          letterSpacing: '0.05em',
+                          textTransform: 'uppercase',
+                          fontSize: '0.7rem',
+                          mb: 1.5,
+                          display: 'block',
+                        }}>
                           Try these suggestions:
                         </Typography>
                         <Stack direction="row" spacing={0.5} justifyContent="center" flexWrap="wrap">
@@ -484,7 +543,21 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                               variant="outlined"
                               clickable
                               onClick={() => handleSuggestionClick(suggestion)}
-                              sx={{ fontSize: '0.7rem', height: 20 }}
+                              sx={{ 
+                                fontSize: '0.7rem', 
+                                height: 24,
+                                fontWeight: 500,
+                                border: '1px solid rgba(99,102,241,0.3)',
+                                background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+                                backdropFilter: 'blur(10px)',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                '&:hover': {
+                                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                  color: 'white',
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: '0 8px 24px rgba(99,102,241,0.2)',
+                                },
+                              }}
                             />
                           ))}
                         </Stack>
@@ -495,14 +568,35 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
 
                 {!loading && !isTyping && results.length > 0 && (
                   <>
-                    <Box sx={{ p: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
+                    <Box sx={{ 
+                      p: 2, 
+                      borderBottom: '1px solid rgba(226,232,240,0.4)',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(139,92,246,0.03) 100%)',
+                    }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="caption" sx={{
+                          color: 'text.secondary',
+                          fontWeight: 600,
+                          letterSpacing: '0.05em',
+                          textTransform: 'uppercase',
+                          fontSize: '0.7rem',
+                        }}>
                           Quick Results
                         </Typography>
-                        <Typography variant="caption" color="primary">
-                          {results.length} found
-                        </Typography>
+                        <Box sx={{
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 2,
+                          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                          color: 'white',
+                        }}>
+                          <Typography variant="caption" sx={{
+                            fontWeight: 600,
+                            fontSize: '0.7rem',
+                          }}>
+                            {results.length} found
+                          </Typography>
+                        </Box>
                       </Stack>
                     </Box>
                     <List sx={{ py: 0 }}>
@@ -512,10 +606,15 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                           component="div"
                           onClick={() => handleDocumentClick(doc)}
                           sx={{
-                            py: 1,
+                            py: 1.5,
                             cursor: 'pointer',
+                            borderRadius: 2,
+                            mx: 1,
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             '&:hover': {
-                              backgroundColor: 'action.hover',
+                              background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%)',
+                              transform: 'translateX(4px)',
+                              boxShadow: '0 4px 16px rgba(99,102,241,0.1)',
                             },
                           }}
                         >
@@ -587,13 +686,30 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                     </List>
                     
                     {results.length >= 5 && (
-                      <Box sx={{ p: 1, textAlign: 'center', borderTop: '1px solid', borderColor: 'divider' }}>
-                        <Typography
-                          variant="caption"
-                          color="primary"
+                      <Box sx={{ 
+                        p: 2, 
+                        textAlign: 'center', 
+                        borderTop: '1px solid rgba(226,232,240,0.4)',
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(139,92,246,0.03) 100%)',
+                      }}>
+                        <Box
                           sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            px: 3,
+                            py: 1.5,
+                            borderRadius: 2,
+                            background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
                             cursor: 'pointer',
-                            '&:hover': { textDecoration: 'underline' },
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            '&:hover': {
+                              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                              transform: 'translateY(-2px)',
+                              boxShadow: '0 8px 24px rgba(99,102,241,0.2)',
+                              '& .view-all-text': {
+                                color: 'white',
+                              },
+                            },
                           }}
                           onClick={() => {
                             saveRecentSearch(query);
@@ -601,8 +717,20 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                             navigate(`/search?q=${encodeURIComponent(query)}`);
                           }}
                         >
-                          View all results for "{query}"
-                        </Typography>
+                          <Typography
+                            className="view-all-text"
+                            variant="caption"
+                            sx={{
+                              color: '#6366f1',
+                              fontWeight: 600,
+                              letterSpacing: '0.025em',
+                              fontSize: '0.8rem',
+                              transition: 'color 0.2s ease-in-out',
+                            }}
+                          >
+                            View all results for "{query}"
+                          </Typography>
+                        </Box>
                       </Box>
                     )}
                   </>
@@ -610,8 +738,18 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
 
                 {!query && recentSearches.length > 0 && (
                   <>
-                    <Box sx={{ p: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
+                    <Box sx={{ 
+                      p: 2, 
+                      borderBottom: '1px solid rgba(226,232,240,0.4)',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(139,92,246,0.03) 100%)',
+                    }}>
+                      <Typography variant="caption" sx={{
+                        color: 'text.secondary',
+                        fontWeight: 600,
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                        fontSize: '0.7rem',
+                      }}>
                         Recent Searches
                       </Typography>
                     </Box>
@@ -622,10 +760,15 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                           component="div"
                           onClick={() => handleRecentSearchClick(search)}
                           sx={{
-                            py: 1,
+                            py: 1.5,
                             cursor: 'pointer',
+                            borderRadius: 2,
+                            mx: 1,
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             '&:hover': {
-                              backgroundColor: 'action.hover',
+                              background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%)',
+                              transform: 'translateX(4px)',
+                              boxShadow: '0 4px 16px rgba(99,102,241,0.1)',
                             },
                           }}
                         >
@@ -646,11 +789,28 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                 )}
 
                 {!query && recentSearches.length === 0 && (
-                  <Box sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <Box sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.02) 0%, rgba(139,92,246,0.02) 100%)',
+                  }}>
+                    <Typography variant="body2" sx={{
+                      color: 'text.secondary',
+                      fontWeight: 500,
+                      letterSpacing: '0.025em',
+                      mb: 1,
+                    }}>
                       Start typing to search documents
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                    <Typography variant="caption" sx={{
+                      color: 'text.secondary',
+                      fontWeight: 600,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      fontSize: '0.7rem',
+                      mb: 2,
+                      display: 'block',
+                    }}>
                       Popular searches:
                     </Typography>
                     <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
@@ -664,9 +824,16 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                           onClick={() => handlePopularSearchClick(search)}
                           sx={{ 
                             fontSize: '0.75rem',
+                            fontWeight: 500,
+                            border: '1px solid rgba(99,102,241,0.3)',
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+                            backdropFilter: 'blur(10px)',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             '&:hover': {
-                              backgroundColor: 'primary.light',
-                              color: 'primary.contrastText',
+                              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                              color: 'white',
+                              transform: 'translateY(-2px)',
+                              boxShadow: '0 8px 24px rgba(99,102,241,0.2)',
                             }
                           }}
                         />

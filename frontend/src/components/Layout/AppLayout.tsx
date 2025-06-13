@@ -89,66 +89,145 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)',
+      backdropFilter: 'blur(20px)',
+      borderRight: '1px solid rgba(226,232,240,0.5)',
+    }}>
       {/* Logo Section */}
-      <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+      <Box sx={{ 
+        p: 3, 
+        borderBottom: '1px solid rgba(226,232,240,0.3)',
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(139,92,246,0.05) 100%)',
+      }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box
             sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 2,
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              width: 44,
+              height: 44,
+              borderRadius: 3,
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
-              fontWeight: 'bold',
-              fontSize: '1.2rem',
+              fontWeight: 800,
+              fontSize: '1.3rem',
+              boxShadow: '0 8px 32px rgba(99,102,241,0.3)',
+              position: 'relative',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%)',
+                backdropFilter: 'blur(10px)',
+              },
             }}
           >
-            R
+            <Box sx={{ position: 'relative', zIndex: 1 }}>R</Box>
           </Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            Readur
-          </Typography>
+          <Box>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 800, 
+              color: 'text.primary',
+              background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.025em',
+            }}>
+              Readur
+            </Typography>
+            <Typography variant="caption" sx={{ 
+              color: 'text.secondary', 
+              fontWeight: 500,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              fontSize: '0.7rem',
+            }}>
+              AI Document Platform
+            </Typography>
+          </Box>
         </Box>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Document Intelligence Platform
-        </Typography>
       </Box>
 
       {/* Navigation */}
-      <List sx={{ flex: 1, px: 2, py: 1 }}>
+      <List sx={{ flex: 1, px: 3, py: 2 }}>
         {navigationItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
           
           return (
-            <ListItem key={item.text} sx={{ px: 0, mb: 0.5 }}>
+            <ListItem key={item.text} sx={{ px: 0, mb: 1 }}>
               <ListItemButton
                 onClick={() => navigate(item.path)}
                 sx={{
-                  borderRadius: 2,
-                  minHeight: 48,
-                  backgroundColor: isActive ? 'primary.main' : 'transparent',
-                  color: isActive ? 'primary.contrastText' : 'text.primary',
+                  borderRadius: 3,
+                  minHeight: 52,
+                  px: 2.5,
+                  py: 1.5,
+                  background: isActive 
+                    ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' 
+                    : 'transparent',
+                  color: isActive ? 'white' : 'text.primary',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s ease-in-out',
                   '&:hover': {
-                    backgroundColor: isActive ? 'primary.dark' : 'action.hover',
+                    backgroundColor: isActive ? 'transparent' : 'rgba(99,102,241,0.08)',
+                    transform: isActive ? 'none' : 'translateX(4px)',
+                    '&::before': isActive ? {} : {
+                      content: '""',
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: '3px',
+                      background: 'linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%)',
+                      borderRadius: '0 2px 2px 0',
+                    },
                   },
+                  '&::after': isActive ? {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+                    backdropFilter: 'blur(10px)',
+                  } : {},
                   '& .MuiListItemIcon-root': {
-                    color: isActive ? 'primary.contrastText' : 'text.secondary',
+                    color: isActive ? 'white' : 'text.secondary',
+                    minWidth: 36,
+                    position: 'relative',
+                    zIndex: 1,
                   },
+                  '& .MuiListItemText-root': {
+                    position: 'relative',
+                    zIndex: 1,
+                  },
+                  ...(isActive && {
+                    boxShadow: '0 8px 32px rgba(99,102,241,0.3)',
+                  }),
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  <Icon />
+                <ListItemIcon>
+                  <Icon sx={{ fontSize: '1.25rem' }} />
                 </ListItemIcon>
                 <ListItemText 
                   primary={item.text}
                   primaryTypographyProps={{
-                    fontSize: '0.875rem',
+                    fontSize: '0.9rem',
                     fontWeight: isActive ? 600 : 500,
+                    letterSpacing: '0.025em',
                   }}
                 />
               </ListItemButton>
@@ -158,20 +237,40 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       </List>
 
       {/* User Info */}
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ 
+        p: 3, 
+        borderTop: '1px solid rgba(226,232,240,0.3)',
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(139,92,246,0.03) 100%)',
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2.5,
+          p: 2,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+        }}>
           <Avatar
             sx={{
-              width: 36,
-              height: 36,
-              bgcolor: 'primary.main',
-              fontSize: '0.875rem',
+              width: 42,
+              height: 42,
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              fontSize: '1rem',
+              fontWeight: 600,
+              boxShadow: '0 4px 16px rgba(99,102,241,0.3)',
             }}
           >
             {user?.username?.charAt(0).toUpperCase()}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+            <Typography variant="body2" sx={{ 
+              fontWeight: 600, 
+              color: 'text.primary',
+              letterSpacing: '0.025em',
+            }}>
               {user?.username}
             </Typography>
             <Typography 
@@ -182,6 +281,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                fontSize: '0.75rem',
+                fontWeight: 500,
               }}
             >
               {user?.email}
@@ -202,6 +303,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.90) 100%)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(226,232,240,0.5)',
+          boxShadow: '0 4px 32px rgba(0,0,0,0.04)',
         }}
       >
         <Toolbar>
@@ -215,29 +320,77 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <MenuIcon />
           </IconButton>
           
-          <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600, mr: 2 }}>
+          <Typography variant="h6" noWrap component="div" sx={{ 
+            fontWeight: 700, 
+            mr: 2,
+            background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            letterSpacing: '-0.025em',
+          }}>
             {navigationItems.find(item => item.path === location.pathname)?.text || 'Dashboard'}
           </Typography>
 
           {/* Global Search Bar */}
-          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', mr: 2 }}>
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', mr: 3 }}>
             <GlobalSearchBar />
           </Box>
 
           {/* Notifications */}
-          <IconButton color="inherit" sx={{ mr: 1 }}>
-            <Badge badgeContent={3} color="secondary">
-              <NotificationsIcon />
+          <IconButton 
+            sx={{ 
+              mr: 2,
+              color: 'text.secondary',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 2.5,
+              width: 44,
+              height: 44,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 8px 24px rgba(99,102,241,0.15)',
+              },
+            }}
+          >
+            <Badge 
+              badgeContent={3} 
+              sx={{
+                '& .MuiBadge-badge': {
+                  background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                },
+              }}
+            >
+              <NotificationsIcon sx={{ fontSize: '1.25rem' }} />
             </Badge>
           </IconButton>
 
           {/* Profile Menu */}
           <IconButton
-            color="inherit"
             onClick={handleProfileMenuOpen}
-            sx={{ ml: 1 }}
+            sx={{ 
+              color: 'text.secondary',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 2.5,
+              width: 44,
+              height: 44,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 8px 24px rgba(99,102,241,0.15)',
+              },
+            }}
           >
-            <AccountIcon />
+            <AccountIcon sx={{ fontSize: '1.25rem' }} />
           </IconButton>
           
           <Menu
