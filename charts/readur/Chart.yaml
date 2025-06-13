@@ -1,0 +1,46 @@
+apiVersion: v2
+type: application
+name: readur
+home: https://github.com/readur/helm-charts
+icon: https://github.com/readur/helm-charts/commit/icon.png
+deprecated: false
+description: |-
+  Build your personal knowledge base with readur Notes. A hierarchical note taking application with focus on building large personal knowledge bases.
+annotations:
+  category: Notes
+version: 1.3.0
+appVersion: 0.92.4
+kubeVersion: ">= 1.19"
+dependencies:
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts
+    version: 3.3.2
+keywords:
+  - electron
+  - wiki
+  - notebook
+  - notes
+  - self-hosted
+  - knowledge-graph
+  - electron-app
+  - note-taking
+  - self-hosting
+  - knowledge-base
+  - personal-knowledge-base
+  - knowledge-management
+  - personal-wiki
+  - notes-app
+  - scriptable
+  - knowledge-management-graph
+  - note-managment
+  - note-taker
+  - local-first
+maintainers:
+  - name: readur
+    url: https://github.com/readur/Notes
+  - name: perfectra1n
+    email: jon@jonfuller.io
+    url: https://perf3ct.tech
+sources:
+  - https://github.com/readur/helm-charts
+  - hhttps://github.com/readur/Notes
