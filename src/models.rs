@@ -2,8 +2,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -13,26 +14,26 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateUser {
     pub username: String,
     pub email: String,
     pub password: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct LoginResponse {
     pub token: String,
     pub user: UserResponse,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
     pub id: Uuid,
     pub username: String,
@@ -55,7 +56,7 @@ pub struct Document {
     pub user_id: Uuid,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DocumentResponse {
     pub id: Uuid,
     pub filename: String,
@@ -67,7 +68,7 @@ pub struct DocumentResponse {
     pub has_ocr_text: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SearchRequest {
     pub query: String,
     pub tags: Option<Vec<String>>,
@@ -79,7 +80,7 @@ pub struct SearchRequest {
     pub search_mode: Option<SearchMode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub enum SearchMode {
     #[serde(rename = "simple")]
     Simple,
@@ -97,7 +98,7 @@ impl Default for SearchMode {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SearchSnippet {
     pub text: String,
     pub start_offset: i32,
@@ -105,13 +106,13 @@ pub struct SearchSnippet {
     pub highlight_ranges: Vec<HighlightRange>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct HighlightRange {
     pub start: i32,
     pub end: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct EnhancedDocumentResponse {
     pub id: Uuid,
     pub filename: String,
@@ -125,7 +126,7 @@ pub struct EnhancedDocumentResponse {
     pub snippets: Vec<SearchSnippet>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SearchResponse {
     pub documents: Vec<EnhancedDocumentResponse>,
     pub total: i64,
@@ -158,14 +159,14 @@ impl From<User> for UserResponse {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateUser {
     pub username: Option<String>,
     pub email: Option<String>,
     pub password: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Settings {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -189,7 +190,7 @@ pub struct Settings {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SettingsResponse {
     pub ocr_language: String,
     pub concurrent_ocr_jobs: i32,
@@ -209,7 +210,7 @@ pub struct SettingsResponse {
     pub enable_background_ocr: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateSettings {
     pub ocr_language: Option<String>,
     pub concurrent_ocr_jobs: Option<i32>,

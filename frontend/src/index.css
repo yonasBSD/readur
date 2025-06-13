@@ -1,3 +1,74 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Enhanced search responsiveness styles */
+.search-input-responsive {
+  transition: all 0.2s ease-in-out;
+}
+
+.search-input-responsive:focus-within {
+  transform: scale(1.02);
+}
+
+/* Mobile-friendly search results */
+@media (max-width: 768px) {
+  .search-results-grid {
+    gap: 1rem !important;
+  }
+  
+  .search-card {
+    padding: 0.75rem !important;
+  }
+  
+  .search-chip {
+    font-size: 0.7rem !important;
+    height: 18px !important;
+  }
+}
+
+/* Touch-friendly interactive elements */
+@media (pointer: coarse) {
+  .search-suggestion-chip {
+    min-height: 32px;
+    padding: 8px 12px;
+  }
+  
+  .search-filter-button {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+
+/* Smooth animations for search loading states */
+.search-loading-fade {
+  opacity: 0;
+  animation: searchFadeIn 0.3s ease-in-out forwards;
+}
+
+@keyframes searchFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Enhanced hover states for better UX */
+.search-result-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-result-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Improved focus states for accessibility */
+.search-focusable:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}

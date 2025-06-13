@@ -6,6 +6,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
+use utoipa::path;
 
 use crate::{
     auth::AuthUser,
@@ -19,6 +20,21 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/enhanced", get(enhanced_search_documents))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/search",
+    tag = "search",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        SearchRequest
+    ),
+    responses(
+        (status = 200, description = "Search results", body = SearchResponse),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn search_documents(
     State(state): State<Arc<AppState>>,
     auth_user: AuthUser,
@@ -51,6 +67,21 @@ async fn search_documents(
     Ok(Json(response))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/search/enhanced",
+    tag = "search",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        SearchRequest
+    ),
+    responses(
+        (status = 200, description = "Enhanced search results with snippets and suggestions", body = SearchResponse),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn enhanced_search_documents(
     State(state): State<Arc<AppState>>,
     auth_user: AuthUser,

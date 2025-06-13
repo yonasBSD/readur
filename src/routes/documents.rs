@@ -7,6 +7,7 @@ use axum::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
+use utoipa::{path, ToSchema};
 
 use crate::{
     auth::AuthUser,
@@ -16,7 +17,7 @@ use crate::{
     AppState,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 struct PaginationQuery {
     limit: Option<i64>,
     offset: Option<i64>,
@@ -29,6 +30,21 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/:id/download", get(download_document))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/documents",
+    tag = "documents",
+    security(
+        ("bearer_auth" = [])
+    ),
+    request_body(content = String, description = "Multipart form data with file", content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Document uploaded successfully", body = DocumentResponse),
+        (status = 400, description = "Bad request - invalid file or data"),
+        (status = 413, description = "Payload too large - file exceeds size limit"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn upload_document(
     State(state): State<Arc<AppState>>,
     auth_user: AuthUser,
@@ -119,6 +135,22 @@ async fn upload_document(
     Err(StatusCode::BAD_REQUEST)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/documents",
+    tag = "documents",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        ("limit" = Option<i64>, Query, description = "Number of documents to return (default: 50)"),
+        ("offset" = Option<i64>, Query, description = "Number of documents to skip (default: 0)")
+    ),
+    responses(
+        (status = 200, description = "List of user documents", body = Vec<DocumentResponse>),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn list_documents(
     State(state): State<Arc<AppState>>,
     auth_user: AuthUser,
@@ -138,6 +170,22 @@ async fn list_documents(
     Ok(Json(response))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/documents/{id}/download",
+    tag = "documents",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        ("id" = uuid::Uuid, Path, description = "Document ID")
+    ),
+    responses(
+        (status = 200, description = "Document file content", content_type = "application/octet-stream"),
+        (status = 404, description = "Document not found"),
+        (status = 401, description = "Unauthorized")
+    )
+)]
 async fn download_document(
     State(state): State<Arc<AppState>>,
     auth_user: AuthUser,

@@ -2,10 +2,11 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::Json,
-    routing::get,
+    routing::{get, put},
     Router,
 };
 use std::sync::Arc;
+use utoipa::path;
 
 use crate::{
     auth::AuthUser,

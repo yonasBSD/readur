@@ -18,6 +18,7 @@ mod ocr;
 mod ocr_queue;
 mod routes;
 mod seed;
+mod swagger;
 mod watcher;
 
 #[cfg(test)]
@@ -54,6 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api/search", routes::search::router())
         .nest("/api/settings", routes::settings::router())
         .nest("/api/users", routes::users::router())
+        .merge(swagger::create_swagger_router())
         .nest_service("/", ServeDir::new("/app/frontend"))
         .fallback(serve_spa)
         .layer(CorsLayer::permissive())

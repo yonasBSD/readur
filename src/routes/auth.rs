@@ -6,6 +6,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
+use utoipa::path;
 
 use crate::{
     auth::{create_jwt, AuthUser},
@@ -20,6 +21,16 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/me", get(me))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/auth/register",
+    tag = "auth",
+    request_body = CreateUser,
+    responses(
+        (status = 200, description = "User registered successfully", body = UserResponse),
+        (status = 400, description = "Bad request - invalid user data")
+    )
+)]
 async fn register(
     State(state): State<Arc<AppState>>,
     Json(user_data): Json<CreateUser>,
@@ -33,6 +44,16 @@ async fn register(
     Ok(Json(user.into()))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/auth/login",
+    tag = "auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = LoginResponse),
+        (status = 401, description = "Unauthorized - invalid credentials")
+    )
+)]
 async fn login(
     State(state): State<Arc<AppState>>,
     Json(login_data): Json<LoginRequest>,
@@ -60,6 +81,18 @@ async fn login(
     }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/auth/me",
+    tag = "auth",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "Current user information", body = UserResponse),
+        (status = 401, description = "Unauthorized - invalid or missing token")
+    )
+)]
 async fn me(auth_user: AuthUser) -> Json<UserResponse> {
     Json(auth_user.user.into())
 }

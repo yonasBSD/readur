@@ -30,6 +30,8 @@ dotenvy = "0.15"
 hostname = "0.4"
 walkdir = "2"
 clap = { version = "4", features = ["derive"] }
+utoipa = { version = "4", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "6", features = ["axum"] }
 
 [features]
 default = ["ocr"]

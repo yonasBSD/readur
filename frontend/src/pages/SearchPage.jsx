@@ -58,6 +58,7 @@ import {
   TrendingUp as TrendingIcon,
 } from '@mui/icons-material';
 import { documentService } from '../services/api';
+import SearchGuidance from '../components/SearchGuidance';
 
 const SearchPage = () => {
   const navigate = useNavigate();
@@ -70,6 +71,16 @@ const SearchPage = () => {
   const [queryTime, setQueryTime] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
   const [suggestions, setSuggestions] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [searchProgress, setSearchProgress] = useState(0);
+  const [quickSuggestions, setQuickSuggestions] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchTips, setSearchTips] = useState([
+    'Use quotes for exact phrases: "project plan"',
+    'Search by tags: tag:important or tag:invoice', 
+    'Combine terms: contract AND payment',
+    'Use wildcards: proj* for project, projects, etc.'
+  ]);
   
   // Search settings
   const [useEnhancedSearch, setUseEnhancedSearch] = useState(true);
@@ -95,13 +106,44 @@ const SearchPage = () => {
     { value: 'application/vnd.openxmlformats-officedocument', label: 'Office Documents' },
   ];
 
-  // Debounced search
+  // Enhanced debounced search with typing indicators
   const debounce = useCallback((func, delay) => {
     let timeoutId;
     return (...args) => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func.apply(null, args), delay);
+      setIsTyping(true);
+      timeoutId = setTimeout(() => {
+        setIsTyping(false);
+        func.apply(null, args);
+      }, delay);
     };
+  }, []);
+
+  // Quick suggestions generator
+  const generateQuickSuggestions = useCallback((query) => {
+    if (!query || query.length < 2) {
+      setQuickSuggestions([]);
+      return;
+    }
+    
+    const suggestions = [];
+    
+    // Add exact phrase suggestion
+    if (!query.includes('"')) {
+      suggestions.push(`"${query}"`);
+    }
+    
+    // Add tag suggestions
+    if (!query.startsWith('tag:')) {
+      suggestions.push(`tag:${query}`);
+    }
+    
+    // Add wildcard suggestion
+    if (!query.includes('*')) {
+      suggestions.push(`${query}*`);
+    }
+    
+    setQuickSuggestions(suggestions.slice(0, 3));
   }, []);
 
   const performSearch = useCallback(async (query, filters = {}) => {
@@ -110,12 +152,19 @@ const SearchPage = () => {
       setTotalResults(0);
       setQueryTime(0);
       setSuggestions([]);
+      setQuickSuggestions([]);
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
+      setSearchProgress(0);
+      
+      // Simulate progressive loading for better UX
+      const progressInterval = setInterval(() => {
+        setSearchProgress(prev => Math.min(prev + 20, 90));
+      }, 100);
       
       const searchRequest = {
         query: query.trim(),
@@ -162,6 +211,9 @@ const SearchPage = () => {
         });
       }
       
+      clearInterval(progressInterval);
+      setSearchProgress(100);
+      
       setSearchResults(results);
       setTotalResults(response.data.total || results.length);
       setQueryTime(response.data.query_time_ms || 0);
@@ -171,7 +223,12 @@ const SearchPage = () => {
       const tags = [...new Set(results.flatMap(doc => doc.tags))];
       setAvailableTags(tags);
       
+      // Clear progress after a brief delay
+      setTimeout(() => setSearchProgress(0), 500);
+      
     } catch (err) {
+      clearInterval(progressInterval);
+      setSearchProgress(0);
       setError('Search failed. Please try again.');
       console.error(err);
     } finally {
@@ -180,8 +237,13 @@ const SearchPage = () => {
   }, [useEnhancedSearch, includeSnippets, snippetLength, searchMode]);
 
   const debouncedSearch = useCallback(
-    debounce((query, filters) => performSearch(query, filters), 500),
+    debounce((query, filters) => performSearch(query, filters), 300),
     [performSearch]
+  );
+  
+  const quickSuggestionsDebounced = useCallback(
+    debounce((query) => generateQuickSuggestions(query), 150),
+    [generateQuickSuggestions]
   );
 
   // Handle URL search params
@@ -201,6 +263,7 @@ const SearchPage = () => {
       hasOcr: hasOcr,
     };
     debouncedSearch(searchQuery, filters);
+    quickSuggestionsDebounced(searchQuery);
     
     // Update URL params when search query changes
     if (searchQuery) {
@@ -208,7 +271,7 @@ const SearchPage = () => {
     } else {
       setSearchParams({});
     }
-  }, [searchQuery, selectedTags, selectedMimeTypes, dateRange, fileSizeRange, hasOcr, debouncedSearch, setSearchParams]);
+  }, [searchQuery, selectedTags, selectedMimeTypes, dateRange, fileSizeRange, hasOcr, debouncedSearch, quickSuggestionsDebounced, setSearchParams]);
 
   const handleClearFilters = () => {
     setSelectedTags([]);
@@ -331,6 +394,7 @@ const SearchPage = () => {
         {/* Enhanced Search Bar */}
         <Paper 
           elevation={3}
+          className="search-input-responsive"
           sx={{
             p: 2,
             mb: 3,
@@ -355,7 +419,13 @@ const SearchPage = () => {
                 endAdornment: (
                   <InputAdornment position="end">
                     <Stack direction="row" spacing={1}>
-                      {loading && <CircularProgress size={20} />}
+                      {(loading || isTyping) && (
+                        <CircularProgress 
+                          size={20} 
+                          variant={searchProgress > 0 ? "determinate" : "indeterminate"}
+                          value={searchProgress}
+                        />
+                      )}
                       {searchQuery && (
                         <IconButton
                           size="small"
@@ -370,6 +440,14 @@ const SearchPage = () => {
                         color={showAdvanced ? 'primary' : 'default'}
                       >
                         <SettingsIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => setShowFilters(!showFilters)}
+                        color={showFilters ? 'primary' : 'default'}
+                        sx={{ display: { xs: 'inline-flex', md: 'none' } }}
+                      >
+                        <FilterIcon />
                       </IconButton>
                     </Stack>
                   </InputAdornment>
@@ -394,15 +472,19 @@ const SearchPage = () => {
               }}
             />
             
-            {/* Loading Progress Bar */}
-            {loading && (
+            {/* Enhanced Loading Progress Bar */}
+            {(loading || isTyping || searchProgress > 0) && (
               <LinearProgress 
+                variant={searchProgress > 0 ? "determinate" : "indeterminate"}
+                value={searchProgress}
                 sx={{ 
                   position: 'absolute',
                   bottom: 0,
                   left: 0,
                   right: 0,
                   borderRadius: '0 0 4px 4px',
+                  opacity: isTyping ? 0.5 : 1,
+                  transition: 'opacity 0.2s ease-in-out',
                 }}
               />
             )}
@@ -443,26 +525,54 @@ const SearchPage = () => {
                 )}
               </Stack>
               
-              {/* Search Mode Selector */}
+              {/* Simplified Search Mode Selector */}
               <ToggleButtonGroup
                 value={searchMode}
                 exclusive
                 onChange={(e, newMode) => newMode && setSearchMode(newMode)}
                 size="small"
               >
-                <ToggleButton value="simple">Simple</ToggleButton>
-                <ToggleButton value="phrase">Phrase</ToggleButton>
-                <ToggleButton value="fuzzy">Fuzzy</ToggleButton>
-                <ToggleButton value="boolean">Boolean</ToggleButton>
+                <ToggleButton value="simple">Smart</ToggleButton>
+                <ToggleButton value="phrase">Exact phrase</ToggleButton>
+                <ToggleButton value="fuzzy">Similar words</ToggleButton>
+                <ToggleButton value="boolean">Advanced</ToggleButton>
               </ToggleButtonGroup>
             </Box>
           )}
 
-          {/* Suggestions */}
+          {/* Quick Suggestions */}
+          {quickSuggestions.length > 0 && searchQuery && !loading && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Quick suggestions:
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {quickSuggestions.map((suggestion, index) => (
+                  <Chip
+                    key={index}
+                    label={suggestion}
+                    size="small"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    clickable
+                    variant="outlined"
+                    color="primary"
+                    sx={{ 
+                      '&:hover': { 
+                        backgroundColor: 'primary.main',
+                        color: 'primary.contrastText',
+                      }
+                    }}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Server Suggestions */}
           {suggestions.length > 0 && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Suggestions:
+                Related searches:
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 {suggestions.map((suggestion, index) => (
@@ -488,47 +598,58 @@ const SearchPage = () => {
           {/* Advanced Search Options */}
           {showAdvanced && (
             <Box sx={{ mt: 3, pt: 2, borderTop: '1px dashed', borderColor: 'divider' }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Search Options
-              </Typography>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} sm={6} md={3}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={useEnhancedSearch}
-                        onChange={(e) => setUseEnhancedSearch(e.target.checked)}
-                        color="primary"
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={8}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Search Options
+                  </Typography>
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} sm={6} md={4}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={useEnhancedSearch}
+                            onChange={(e) => setUseEnhancedSearch(e.target.checked)}
+                            color="primary"
+                          />
+                        }
+                        label="Enhanced Search"
                       />
-                    }
-                    label="Enhanced Search"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={includeSnippets}
-                        onChange={(e) => setIncludeSnippets(e.target.checked)}
-                        color="primary"
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={includeSnippets}
+                            onChange={(e) => setIncludeSnippets(e.target.checked)}
+                            color="primary"
+                          />
+                        }
+                        label="Show Snippets"
                       />
-                    }
-                    label="Show Snippets"
-                  />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <FormControl size="small" fullWidth>
+                        <InputLabel>Snippet Length</InputLabel>
+                        <Select
+                          value={snippetLength}
+                          onChange={(e) => setSnippetLength(e.target.value)}
+                          label="Snippet Length"
+                        >
+                          <MenuItem value={100}>Short (100)</MenuItem>
+                          <MenuItem value={200}>Medium (200)</MenuItem>
+                          <MenuItem value={400}>Long (400)</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <FormControl size="small" fullWidth>
-                    <InputLabel>Snippet Length</InputLabel>
-                    <Select
-                      value={snippetLength}
-                      onChange={(e) => setSnippetLength(e.target.value)}
-                      label="Snippet Length"
-                    >
-                      <MenuItem value={100}>Short (100)</MenuItem>
-                      <MenuItem value={200}>Medium (200)</MenuItem>
-                      <MenuItem value={400}>Long (400)</MenuItem>
-                    </Select>
-                  </FormControl>
+                <Grid item xs={12} md={4}>
+                  <SearchGuidance 
+                    compact 
+                    onExampleClick={setSearchQuery}
+                    sx={{ position: 'relative' }}
+                  />
                 </Grid>
               </Grid>
             </Box>
@@ -537,9 +658,32 @@ const SearchPage = () => {
       </Box>
 
       <Grid container spacing={3}>
-        {/* Filters Sidebar */}
-        <Grid item xs={12} md={3}>
-          <Card sx={{ position: 'sticky', top: 20 }}>
+        {/* Mobile Filters Drawer */}
+        {showFilters && (
+          <Grid item xs={12} sx={{ display: { xs: 'block', md: 'none' } }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FilterIcon />
+                    Filters
+                  </Typography>
+                  <Button size="small" onClick={handleClearFilters} startIcon={<ClearIcon />}>
+                    Clear
+                  </Button>
+                </Box>
+                {/* Mobile filter content would go here - simplified */}
+                <Typography variant="body2" color="text.secondary">
+                  Mobile filters coming soon...
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {/* Desktop Filters Sidebar */}
+        <Grid item xs={12} md={3} sx={{ display: { xs: 'none', md: 'block' } }}>
+          <Card sx={{ position: 'sticky', top: 20 }}>  
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -750,11 +894,42 @@ const SearchPage = () => {
               }}
             >
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                No results found
+                No results found for "{searchQuery}"
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 Try adjusting your search terms or filters
               </Typography>
+              
+              {/* Helpful suggestions for no results */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.primary" gutterBottom>
+                  Suggestions:
+                </Typography>
+                <Stack spacing={1} alignItems="center">
+                  <Typography variant="body2" color="text.secondary">• Try simpler or more general terms</Typography>
+                  <Typography variant="body2" color="text.secondary">• Check spelling and try different keywords</Typography>
+                  <Typography variant="body2" color="text.secondary">• Remove some filters to broaden your search</Typography>
+                  <Typography variant="body2" color="text.secondary">• Use quotes for exact phrases</Typography>
+                </Stack>
+              </Box>
+              
+              <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
+                <Button 
+                  size="small" 
+                  variant="outlined" 
+                  onClick={handleClearFilters}
+                  startIcon={<ClearIcon />}
+                >
+                  Clear Filters
+                </Button>
+                <Button 
+                  size="small" 
+                  variant="outlined" 
+                  onClick={() => setSearchQuery('')}
+                >
+                  New Search
+                </Button>
+              </Stack>
             </Box>
           )}
 
@@ -771,13 +946,46 @@ const SearchPage = () => {
               <Typography variant="h6" color="text.secondary" gutterBottom>
                 Start searching your documents
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 Use the enhanced search bar above to find documents by content, filename, or tags
               </Typography>
+              
+              {/* Search Tips */}
+              <Box sx={{ mb: 3, maxWidth: 600, mx: 'auto' }}>
+                <Typography variant="subtitle2" color="text.primary" gutterBottom>
+                  Search Tips:
+                </Typography>
+                <Stack spacing={1} alignItems="center">
+                  {searchTips.map((tip, index) => (
+                    <Typography key={index} variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+                      {tip}
+                    </Typography>
+                  ))}
+                </Stack>
+              </Box>
+              
               <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
-                <Chip label="Try: invoice" size="small" variant="outlined" />
-                <Chip label="Try: contract" size="small" variant="outlined" />
-                <Chip label="Try: tag:important" size="small" variant="outlined" />
+                <Chip 
+                  label="Try: invoice" 
+                  size="small" 
+                  variant="outlined" 
+                  clickable
+                  onClick={() => setSearchQuery('invoice')}
+                />
+                <Chip 
+                  label="Try: contract" 
+                  size="small" 
+                  variant="outlined" 
+                  clickable
+                  onClick={() => setSearchQuery('contract')}
+                />
+                <Chip 
+                  label="Try: tag:important" 
+                  size="small" 
+                  variant="outlined" 
+                  clickable
+                  onClick={() => setSearchQuery('tag:important')}
+                />
               </Stack>
             </Box>
           )}
@@ -794,15 +1002,11 @@ const SearchPage = () => {
                   key={doc.id}
                 >
                   <Card 
+                    className="search-result-card search-loading-fade"
                     sx={{ 
                       height: '100%',
                       display: 'flex',
                       flexDirection: viewMode === 'list' ? 'row' : 'column',
-                      transition: 'all 0.2s ease-in-out',
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: (theme) => theme.shadows[4],
-                      },
                     }}
                   >
                     {viewMode === 'grid' && (
@@ -821,7 +1025,7 @@ const SearchPage = () => {
                       </Box>
                     )}
                     
-                    <CardContent sx={{ flexGrow: 1 }}>
+                    <CardContent className="search-card" sx={{ flexGrow: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                         {viewMode === 'list' && (
                           <Box sx={{ mr: 1, mt: 0.5 }}>
@@ -847,17 +1051,20 @@ const SearchPage = () => {
                           
                           <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', gap: 0.5 }}>
                             <Chip 
+                              className="search-chip"
                               label={formatFileSize(doc.file_size)} 
                               size="small" 
                               variant="outlined"
                             />
                             <Chip 
+                              className="search-chip"
                               label={formatDate(doc.created_at)} 
                               size="small" 
                               variant="outlined"
                             />
                             {doc.has_ocr_text && (
                               <Chip 
+                                className="search-chip"
                                 label="OCR" 
                                 size="small" 
                                 color="success"
@@ -871,6 +1078,7 @@ const SearchPage = () => {
                               {doc.tags.slice(0, 2).map((tag, index) => (
                                 <Chip 
                                   key={index}
+                                  className="search-chip"
                                   label={tag} 
                                   size="small" 
                                   color="primary"
@@ -880,6 +1088,7 @@ const SearchPage = () => {
                               ))}
                               {doc.tags.length > 2 && (
                                 <Chip 
+                                  className="search-chip"
                                   label={`+${doc.tags.length - 2}`}
                                   size="small" 
                                   variant="outlined"
@@ -928,6 +1137,7 @@ const SearchPage = () => {
                           {doc.search_rank && (
                             <Box sx={{ mt: 1 }}>
                               <Chip 
+                                className="search-chip"
                                 label={`Relevance: ${(doc.search_rank * 100).toFixed(1)}%`}
                                 size="small" 
                                 color="info"
@@ -940,6 +1150,7 @@ const SearchPage = () => {
                         
                         <Tooltip title="View Details">
                           <IconButton
+                            className="search-filter-button search-focusable"
                             size="small"
                             onClick={() => navigate(`/documents/${doc.id}`)}
                           >
@@ -948,6 +1159,7 @@ const SearchPage = () => {
                         </Tooltip>
                         <Tooltip title="Download">
                           <IconButton
+                            className="search-filter-button search-focusable"
                             size="small"
                             onClick={() => handleDownload(doc)}
                           >
