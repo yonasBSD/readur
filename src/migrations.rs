@@ -114,14 +114,23 @@ impl MigrationRunner {
         // Start a transaction
         let mut tx = self.pool.begin().await?;
 
-        // Execute the migration SQL
-        sqlx::query(&migration.sql)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| {
-                error!("Failed to apply migration {}: {}", migration.version, e);
-                e
-            })?;
+        // Split SQL into individual statements and execute each one
+        let statements = self.split_sql_statements(&migration.sql);
+        
+        for (i, statement) in statements.iter().enumerate() {
+            if statement.trim().is_empty() {
+                continue;
+            }
+            
+            sqlx::query(statement)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!("Failed to apply migration {} statement {}: {}\nStatement: {}", 
+                           migration.version, i + 1, e, statement);
+                    e
+                })?;
+        }
 
         // Record the migration as applied
         sqlx::query(
@@ -137,6 +146,61 @@ impl MigrationRunner {
 
         info!("Successfully applied migration {}: {}", migration.version, migration.name);
         Ok(())
+    }
+
+    /// Split SQL content into individual statements
+    fn split_sql_statements(&self, sql: &str) -> Vec<String> {
+        let mut statements = Vec::new();
+        let mut current_statement = String::new();
+        let mut in_function = false;
+        let mut function_depth = 0;
+        
+        for line in sql.lines() {
+            let trimmed = line.trim();
+            
+            // Skip comments and empty lines
+            if trimmed.is_empty() || trimmed.starts_with("--") {
+                continue;
+            }
+            
+            // Detect function definitions (PostgreSQL functions can contain semicolons)
+            if trimmed.contains("CREATE OR REPLACE FUNCTION") || trimmed.contains("CREATE FUNCTION") {
+                in_function = true;
+                function_depth = 0;
+            }
+            
+            current_statement.push_str(line);
+            current_statement.push('\n');
+            
+            // Track function block depth
+            if in_function {
+                if trimmed.contains("BEGIN") {
+                    function_depth += 1;
+                }
+                if trimmed.contains("END;") {
+                    function_depth -= 1;
+                    if function_depth <= 0 {
+                        in_function = false;
+                        statements.push(current_statement.trim().to_string());
+                        current_statement.clear();
+                        continue;
+                    }
+                }
+            }
+            
+            // For non-function statements, split on semicolon
+            if !in_function && trimmed.ends_with(';') {
+                statements.push(current_statement.trim().to_string());
+                current_statement.clear();
+            }
+        }
+        
+        // Add any remaining statement
+        if !current_statement.trim().is_empty() {
+            statements.push(current_statement.trim().to_string());
+        }
+        
+        statements
     }
 
     /// Run all pending migrations
