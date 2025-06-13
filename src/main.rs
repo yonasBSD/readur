@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState { db, config: config.clone() };
     
     let app = Router::new()
-        .route("/api/health", get(health_check))
+        .route("/api/health", get(readur::health_check))
         .nest("/api/auth", routes::auth::router())
         .nest("/api/documents", routes::documents::router())
         .nest("/api/queue", routes::queue::router())
@@ -106,9 +106,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn health_check() -> Result<Json<serde_json::Value>, StatusCode> {
-    Ok(Json(serde_json::json!({"status": "ok"})))
-}
 
 async fn serve_spa() -> Result<Html<String>, StatusCode> {
     match tokio::fs::read_to_string("/app/frontend/index.html").await {

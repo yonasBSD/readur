@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
 use std::path::Path;
+
+#[cfg(feature = "ocr")]
 use tesseract::Tesseract;
 
 pub struct OcrService;
@@ -14,20 +16,36 @@ impl OcrService {
     }
 
     pub async fn extract_text_from_image_with_lang(&self, file_path: &str, lang: &str) -> Result<String> {
-        let mut tesseract = Tesseract::new(None, Some(lang))?
-            .set_image(file_path)?;
+        #[cfg(feature = "ocr")]
+        {
+            let mut tesseract = Tesseract::new(None, Some(lang))?
+                .set_image(file_path)?;
+            
+            let text = tesseract.get_text()?;
+            
+            Ok(text.trim().to_string())
+        }
         
-        let text = tesseract.get_text()?;
-        
-        Ok(text.trim().to_string())
+        #[cfg(not(feature = "ocr"))]
+        {
+            Err(anyhow!("OCR feature is disabled. Recompile with --features ocr"))
+        }
     }
 
     pub async fn extract_text_from_pdf(&self, file_path: &str) -> Result<String> {
-        let bytes = std::fs::read(file_path)?;
-        let text = pdf_extract::extract_text_from_mem(&bytes)
-            .map_err(|e| anyhow!("Failed to extract text from PDF: {}", e))?;
+        #[cfg(feature = "ocr")]
+        {
+            let bytes = std::fs::read(file_path)?;
+            let text = pdf_extract::extract_text_from_mem(&bytes)
+                .map_err(|e| anyhow!("Failed to extract text from PDF: {}", e))?;
+            
+            Ok(text.trim().to_string())
+        }
         
-        Ok(text.trim().to_string())
+        #[cfg(not(feature = "ocr"))]
+        {
+            Err(anyhow!("OCR feature is disabled. Recompile with --features ocr"))
+        }
     }
 
     pub async fn extract_text(&self, file_path: &str, mime_type: &str) -> Result<String> {

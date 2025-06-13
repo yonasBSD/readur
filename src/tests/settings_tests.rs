@@ -41,7 +41,22 @@ mod tests {
         let token = login_user(&app, &user.username, "password123").await;
 
         let update_data = UpdateSettings {
-            ocr_language: "spa".to_string(),
+            ocr_language: Some("spa".to_string()),
+            concurrent_ocr_jobs: None,
+            ocr_timeout_seconds: None,
+            max_file_size_mb: None,
+            allowed_file_types: None,
+            auto_rotate_images: None,
+            enable_image_preprocessing: None,
+            search_results_per_page: None,
+            search_snippet_length: None,
+            fuzzy_search_threshold: None,
+            retention_days: None,
+            enable_auto_cleanup: None,
+            enable_compression: None,
+            memory_limit_mb: None,
+            cpu_priority: None,
+            enable_background_ocr: None,
         };
 
         let response = app
@@ -113,7 +128,22 @@ mod tests {
 
         // Update user1's settings
         let update_data = UpdateSettings {
-            ocr_language: "fra".to_string(),
+            ocr_language: Some("fra".to_string()),
+            concurrent_ocr_jobs: None,
+            ocr_timeout_seconds: None,
+            max_file_size_mb: None,
+            allowed_file_types: None,
+            auto_rotate_images: None,
+            enable_image_preprocessing: None,
+            search_results_per_page: None,
+            search_snippet_length: None,
+            fuzzy_search_threshold: None,
+            retention_days: None,
+            enable_auto_cleanup: None,
+            enable_compression: None,
+            memory_limit_mb: None,
+            cpu_priority: None,
+            enable_background_ocr: None,
         };
 
         let response = app

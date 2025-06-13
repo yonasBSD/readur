@@ -23,13 +23,17 @@ tokio-util = { version = "0.7", features = ["io"] }
 futures-util = "0.3"
 notify = "6"
 mime_guess = "2"
-tesseract = "0.15"
-pdf-extract = "0.7"
+tesseract = { version = "0.15", optional = true }
+pdf-extract = { version = "0.7", optional = true }
 reqwest = { version = "0.11", features = ["json", "multipart"] }
 dotenvy = "0.15"
 hostname = "0.4"
 walkdir = "2"
 clap = { version = "4", features = ["derive"] }
+
+[features]
+default = ["ocr"]
+ocr = ["tesseract", "pdf-extract"]
 
 [dev-dependencies]
 tempfile = "3"

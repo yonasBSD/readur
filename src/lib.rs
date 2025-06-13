@@ -10,6 +10,10 @@ pub mod routes;
 pub mod seed;
 pub mod watcher;
 
+#[cfg(test)]
+mod tests;
+
+use axum::{http::StatusCode, Json};
 use config::Config;
 use db::Database;
 
@@ -17,4 +21,9 @@ use db::Database;
 pub struct AppState {
     pub db: Database,
     pub config: Config,
+}
+
+/// Health check endpoint for monitoring
+pub async fn health_check() -> Result<Json<serde_json::Value>, StatusCode> {
+    Ok(Json(serde_json::json!({"status": "ok"})))
 }

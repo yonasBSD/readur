@@ -105,7 +105,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(not(feature = "ci"), ignore = "Requires tesseract runtime")]
+    #[ignore = "Requires tesseract runtime - run with: cargo test --release -- --ignored"]
     async fn test_extract_text_with_real_image() {
         let ocr_service = OcrService::new();
         

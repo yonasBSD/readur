@@ -27,6 +27,19 @@ pub async fn create_test_app() -> (Router, testcontainers::Container<'static, Po
         upload_path: "./test-uploads".to_string(),
         watch_folder: "./test-watch".to_string(),
         allowed_file_types: vec!["pdf".to_string(), "txt".to_string(), "png".to_string()],
+        watch_interval_seconds: Some(30),
+        file_stability_check_ms: Some(500),
+        max_file_age_hours: None,
+        
+        // OCR Configuration
+        ocr_language: "eng".to_string(),
+        concurrent_ocr_jobs: 2, // Lower for tests
+        ocr_timeout_seconds: 60, // Shorter for tests
+        max_file_size_mb: 10, // Smaller for tests
+        
+        // Performance
+        memory_limit_mb: 256, // Lower for tests
+        cpu_priority: "normal".to_string(),
     };
     
     let state = Arc::new(AppState { db, config });
