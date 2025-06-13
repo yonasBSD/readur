@@ -16,7 +16,7 @@ import {
   Menu,
   MenuItem,
   Divider,
-  useTheme,
+  useTheme as useMuiTheme,
   useMediaQuery,
   Badge,
 } from '@mui/material';
@@ -35,6 +35,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import GlobalSearchBar from '../GlobalSearchBar';
+import ThemeToggle from '../ThemeToggle/ThemeToggle';
 
 const drawerWidth = 280;
 
@@ -62,7 +63,7 @@ const navigationItems: NavigationItem[] = [
 ];
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const theme = useTheme();
+  const theme = useMuiTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -93,15 +94,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       height: '100%', 
       display: 'flex', 
       flexDirection: 'column',
-      background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)',
+      background: theme.palette.mode === 'light' 
+        ? 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)'
+        : 'linear-gradient(180deg, rgba(30,30,30,0.95) 0%, rgba(18,18,18,0.95) 100%)',
       backdropFilter: 'blur(20px)',
-      borderRight: '1px solid rgba(226,232,240,0.5)',
+      borderRight: theme.palette.mode === 'light' 
+        ? '1px solid rgba(226,232,240,0.5)'
+        : '1px solid rgba(255,255,255,0.1)',
     }}>
       {/* Logo Section */}
       <Box sx={{ 
         p: 3, 
-        borderBottom: '1px solid rgba(226,232,240,0.3)',
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(139,92,246,0.05) 100%)',
+        borderBottom: theme.palette.mode === 'light' 
+          ? '1px solid rgba(226,232,240,0.3)'
+          : '1px solid rgba(255,255,255,0.1)',
+        background: theme.palette.mode === 'light'
+          ? 'linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(139,92,246,0.05) 100%)'
+          : 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box
@@ -303,10 +312,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
-          background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.90) 100%)',
+          background: theme.palette.mode === 'light'
+            ? 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.90) 100%)'
+            : 'linear-gradient(135deg, rgba(30,30,30,0.95) 0%, rgba(18,18,18,0.90) 100%)',
           backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(226,232,240,0.5)',
-          boxShadow: '0 4px 32px rgba(0,0,0,0.04)',
+          borderBottom: theme.palette.mode === 'light'
+            ? '1px solid rgba(226,232,240,0.5)'
+            : '1px solid rgba(255,255,255,0.1)',
+          boxShadow: theme.palette.mode === 'light'
+            ? '0 4px 32px rgba(0,0,0,0.04)'
+            : '0 4px 32px rgba(0,0,0,0.2)',
         }}
       >
         <Toolbar>
@@ -370,6 +385,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <NotificationsIcon sx={{ fontSize: '1.25rem' }} />
             </Badge>
           </IconButton>
+
+          {/* Theme Toggle */}
+          <Box sx={{ 
+            mr: 2,
+            background: theme.palette.mode === 'light'
+              ? 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)'
+              : 'linear-gradient(135deg, rgba(50,50,50,0.8) 0%, rgba(30,30,30,0.6) 100%)',
+            backdropFilter: 'blur(10px)',
+            border: theme.palette.mode === 'light'
+              ? '1px solid rgba(255,255,255,0.3)'
+              : '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 2.5,
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': {
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+              transform: 'translateY(-2px)',
+              boxShadow: '0 8px 24px rgba(99,102,241,0.15)',
+            },
+          }}>
+            <ThemeToggle size="medium" color="inherit" />
+          </Box>
 
           {/* Profile Menu */}
           <IconButton

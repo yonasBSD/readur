@@ -1,9 +1,8 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { useAuth } from './contexts/AuthContext';
-import theme from './theme';
+import { ThemeProvider } from './contexts/ThemeContext';
 import Login from './components/Auth/Login';
 import AppLayout from './components/Layout/AppLayout';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -19,7 +18,7 @@ function App(): JSX.Element {
 
   if (loading) {
     return (
-      <ThemeProvider theme={theme}>
+      <ThemeProvider>
         <CssBaseline />
         <div style={{ 
           minHeight: '100vh', 
@@ -48,7 +47,7 @@ function App(): JSX.Element {
   }
 
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider>
       <CssBaseline />
       <Routes>
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
