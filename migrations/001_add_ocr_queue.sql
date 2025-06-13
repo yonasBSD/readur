@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS ocr_queue (
 );
 
 -- Indexes for efficient queue operations
-CREATE INDEX idx_ocr_queue_status ON ocr_queue(status, priority DESC, created_at);
-CREATE INDEX idx_ocr_queue_document_id ON ocr_queue(document_id);
-CREATE INDEX idx_ocr_queue_worker ON ocr_queue(worker_id) WHERE status = 'processing';
-CREATE INDEX idx_ocr_queue_created_at ON ocr_queue(created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_ocr_queue_status ON ocr_queue(status, priority DESC, created_at);
+CREATE INDEX IF NOT EXISTS idx_ocr_queue_document_id ON ocr_queue(document_id);
+CREATE INDEX IF NOT EXISTS idx_ocr_queue_worker ON ocr_queue(worker_id) WHERE status = 'processing';
+CREATE INDEX IF NOT EXISTS idx_ocr_queue_created_at ON ocr_queue(created_at) WHERE status = 'pending';
 
 -- Add processing status to documents
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS ocr_status VARCHAR(20) DEFAULT 'pending';
