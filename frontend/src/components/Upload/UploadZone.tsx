@@ -26,16 +26,39 @@ import {
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, FileRejection, DropzoneOptions } from 'react-dropzone';
 import api from '../../services/api';
 
-const UploadZone = ({ onUploadComplete }) => {
-  const theme = useTheme();
-  const [files, setFiles] = useState([]);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
+interface UploadedDocument {
+  id: string;
+  original_filename: string;
+  filename: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+}
 
-  const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
+interface FileItem {
+  file: File;
+  id: string;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  progress: number;
+  error: string | null;
+}
+
+interface UploadZoneProps {
+  onUploadComplete?: (document: UploadedDocument) => void;
+}
+
+type FileStatus = 'pending' | 'uploading' | 'success' | 'error';
+
+const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
+  const theme = useTheme();
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+
+  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
     setError('');
     
     // Handle rejected files
@@ -47,10 +70,10 @@ const UploadZone = ({ onUploadComplete }) => {
     }
 
     // Add accepted files to the list
-    const newFiles = acceptedFiles.map(file => ({
+    const newFiles: FileItem[] = acceptedFiles.map(file => ({
       file,
       id: Math.random().toString(36).substr(2, 9),
-      status: 'pending', // pending, uploading, success, error
+      status: 'pending' as FileStatus,
       progress: 0,
       error: null,
     }));
@@ -58,7 +81,7 @@ const UploadZone = ({ onUploadComplete }) => {
     setFiles(prev => [...prev, ...newFiles]);
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const dropzoneOptions: DropzoneOptions = {
     onDrop,
     accept: {
       'application/pdf': ['.pdf'],
@@ -69,52 +92,56 @@ const UploadZone = ({ onUploadComplete }) => {
     },
     maxSize: 50 * 1024 * 1024, // 50MB
     multiple: true,
-  });
+  };
 
-  const removeFile = (fileId) => {
+  const { getRootProps, getInputProps, isDragActive } = useDropzone(dropzoneOptions);
+
+  const removeFile = (fileId: string): void => {
     setFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
-  const uploadFile = async (fileItem) => {
+  const uploadFile = async (fileItem: FileItem): Promise<void> => {
     const formData = new FormData();
     formData.append('file', fileItem.file);
 
     try {
       setFiles(prev => prev.map(f => 
         f.id === fileItem.id 
-          ? { ...f, status: 'uploading', progress: 0 }
+          ? { ...f, status: 'uploading' as FileStatus, progress: 0 }
           : f
       ));
 
-      const response = await api.post('/documents', formData, {
+      const response = await api.post<UploadedDocument>('/documents', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         onUploadProgress: (progressEvent) => {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setFiles(prev => prev.map(f => 
-            f.id === fileItem.id 
-              ? { ...f, progress }
-              : f
-          ));
+          if (progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setFiles(prev => prev.map(f => 
+              f.id === fileItem.id 
+                ? { ...f, progress }
+                : f
+            ));
+          }
         },
       });
 
       setFiles(prev => prev.map(f => 
         f.id === fileItem.id 
-          ? { ...f, status: 'success', progress: 100 }
+          ? { ...f, status: 'success' as FileStatus, progress: 100 }
           : f
       ));
 
       if (onUploadComplete) {
         onUploadComplete(response.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       setFiles(prev => prev.map(f => 
         f.id === fileItem.id 
           ? { 
               ...f, 
-              status: 'error', 
+              status: 'error' as FileStatus, 
               error: error.response?.data?.message || 'Upload failed',
               progress: 0,
             }
@@ -123,7 +150,7 @@ const UploadZone = ({ onUploadComplete }) => {
     }
   };
 
-  const uploadAllFiles = async () => {
+  const uploadAllFiles = async (): Promise<void> => {
     setUploading(true);
     setError('');
 
@@ -138,15 +165,15 @@ const UploadZone = ({ onUploadComplete }) => {
     }
   };
 
-  const retryUpload = (fileItem) => {
+  const retryUpload = (fileItem: FileItem): void => {
     uploadFile(fileItem);
   };
 
-  const clearCompleted = () => {
+  const clearCompleted = (): void => {
     setFiles(prev => prev.filter(f => f.status !== 'success'));
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -154,7 +181,7 @@ const UploadZone = ({ onUploadComplete }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: FileStatus): string => {
     switch (status) {
       case 'success': return theme.palette.success.main;
       case 'error': return theme.palette.error.main;
@@ -163,7 +190,7 @@ const UploadZone = ({ onUploadComplete }) => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: FileStatus): React.ReactElement => {
     switch (status) {
       case 'success': return <CheckIcon />;
       case 'error': return <ErrorIcon />;

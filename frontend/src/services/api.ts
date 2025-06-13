@@ -81,6 +81,19 @@ export interface QueueStats {
   oldest_pending_minutes?: number
 }
 
+export interface OcrResponse {
+  document_id: string
+  filename: string
+  has_ocr_text: boolean
+  ocr_text?: string
+  ocr_confidence?: number
+  ocr_word_count?: number
+  ocr_processing_time_ms?: number
+  ocr_status?: string
+  ocr_error?: string
+  ocr_completed_at?: string
+}
+
 export const documentService = {
   upload: (file: File) => {
     const formData = new FormData()
@@ -102,6 +115,10 @@ export const documentService = {
     return api.get(`/documents/${id}/download`, {
       responseType: 'blob',
     })
+  },
+
+  getOcrText: (id: string) => {
+    return api.get<OcrResponse>(`/documents/${id}/ocr`)
   },
 
   search: (searchRequest: SearchRequest) => {

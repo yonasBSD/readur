@@ -34,16 +34,29 @@ import {
   Search as SearchIcon,
   Edit as EditIcon,
 } from '@mui/icons-material';
-import { documentService } from '../services/api';
+import { documentService, OcrResponse } from '../services/api';
 
-const DocumentDetailsPage = () => {
-  const { id } = useParams();
+interface Document {
+  id: string;
+  original_filename: string;
+  filename?: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+  has_ocr_text?: boolean;
+  tags?: string[];
+}
+
+const DocumentDetailsPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [document, setDocument] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [ocrText, setOcrText] = useState('');
-  const [showOcrDialog, setShowOcrDialog] = useState(false);
+  const [document, setDocument] = useState<Document | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [ocrText, setOcrText] = useState<string>('');
+  const [ocrData, setOcrData] = useState<OcrResponse | null>(null);
+  const [showOcrDialog, setShowOcrDialog] = useState<boolean>(false);
+  const [ocrLoading, setOcrLoading] = useState<boolean>(false);
 
   useEffect(() => {
     if (id) {
@@ -51,7 +64,7 @@ const DocumentDetailsPage = () => {
     }
   }, [id]);
 
-  const fetchDocumentDetails = async () => {
+  const fetchDocumentDetails = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -63,11 +76,6 @@ const DocumentDetailsPage = () => {
       
       if (foundDoc) {
         setDocument(foundDoc);
-        // If the document has OCR text, we could fetch it here
-        // For now, we'll show a placeholder
-        if (foundDoc.has_ocr_text) {
-          setOcrText('OCR text extraction feature would be available here. The document has been processed and text content is available for search.');
-        }
       } else {
         setError('Document not found');
       }
@@ -79,7 +87,9 @@ const DocumentDetailsPage = () => {
     }
   };
 
-  const handleDownload = async () => {
+  const handleDownload = async (): Promise<void> => {
+    if (!document) return;
+    
     try {
       const response = await documentService.download(document.id);
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -95,21 +105,44 @@ const DocumentDetailsPage = () => {
     }
   };
 
-  const getFileIcon = (mimeType) => {
+  const fetchOcrText = async (): Promise<void> => {
+    if (!document || !document.has_ocr_text) return;
+    
+    try {
+      setOcrLoading(true);
+      const response = await documentService.getOcrText(document.id);
+      setOcrData(response.data);
+      setOcrText(response.data.ocr_text || 'No OCR text available');
+    } catch (err) {
+      console.error('Failed to fetch OCR text:', err);
+      setOcrText('Failed to load OCR text. Please try again.');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleViewOcr = (): void => {
+    setShowOcrDialog(true);
+    if (!ocrData) {
+      fetchOcrText();
+    }
+  };
+
+  const getFileIcon = (mimeType?: string): React.ReactElement => {
     if (mimeType?.includes('pdf')) return <PdfIcon color="error" sx={{ fontSize: 64 }} />;
     if (mimeType?.includes('image')) return <ImageIcon color="primary" sx={{ fontSize: 64 }} />;
     if (mimeType?.includes('text')) return <TextIcon color="info" sx={{ fontSize: 64 }} />;
     return <DocIcon color="secondary" sx={{ fontSize: 64 }} />;
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number): string => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 Bytes';
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -210,7 +243,7 @@ const DocumentDetailsPage = () => {
                   <Button
                     variant="outlined"
                     startIcon={<SearchIcon />}
-                    onClick={() => setShowOcrDialog(true)}
+                    onClick={handleViewOcr}
                     sx={{ borderRadius: 2 }}
                   >
                     View OCR
@@ -372,32 +405,78 @@ const DocumentDetailsPage = () => {
         fullWidth
       >
         <DialogTitle>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Extracted Text (OCR)
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Extracted Text (OCR)
+            </Typography>
+            {ocrData && (
+              <Stack direction="row" spacing={1}>
+                {ocrData.ocr_confidence && (
+                  <Chip 
+                    label={`${Math.round(ocrData.ocr_confidence)}% confidence`} 
+                    color="primary" 
+                    size="small" 
+                  />
+                )}
+                {ocrData.ocr_word_count && (
+                  <Chip 
+                    label={`${ocrData.ocr_word_count} words`} 
+                    color="secondary" 
+                    size="small" 
+                  />
+                )}
+              </Stack>
+            )}
+          </Box>
         </DialogTitle>
         <DialogContent>
-          <Paper
-            sx={{
-              p: 2,
-              backgroundColor: 'grey.50',
-              border: '1px solid',
-              borderColor: 'grey.200',
-              maxHeight: 400,
-              overflow: 'auto',
-            }}
-          >
-            <Typography
-              variant="body2"
-              sx={{
-                fontFamily: 'monospace',
-                whiteSpace: 'pre-wrap',
-                color: ocrText ? 'text.primary' : 'text.secondary',
-              }}
-            >
-              {ocrText || 'OCR text extraction is not yet implemented in the frontend. The backend processes documents and stores extracted text for search functionality.'}
-            </Typography>
-          </Paper>
+          {ocrLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography variant="body2" sx={{ ml: 2 }}>
+                Loading OCR text...
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {ocrData && ocrData.ocr_error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  OCR Error: {ocrData.ocr_error}
+                </Alert>
+              )}
+              <Paper
+                sx={{
+                  p: 2,
+                  backgroundColor: 'grey.50',
+                  border: '1px solid',
+                  borderColor: 'grey.200',
+                  maxHeight: 400,
+                  overflow: 'auto',
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontFamily: 'monospace',
+                    whiteSpace: 'pre-wrap',
+                    color: ocrText ? 'text.primary' : 'text.secondary',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {ocrText || 'No OCR text available for this document.'}
+                </Typography>
+              </Paper>
+              {ocrData && (ocrData.ocr_processing_time_ms || ocrData.ocr_completed_at) && (
+                <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'grey.200' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {ocrData.ocr_processing_time_ms && `Processing time: ${ocrData.ocr_processing_time_ms}ms`}
+                    {ocrData.ocr_processing_time_ms && ocrData.ocr_completed_at && ' • '}
+                    {ocrData.ocr_completed_at && `Completed: ${new Date(ocrData.ocr_completed_at).toLocaleString()}`}
+                  </Typography>
+                </Box>
+              )}
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowOcrDialog(false)}>

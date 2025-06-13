@@ -14,6 +14,8 @@ import {
   Paper,
   IconButton,
   Collapse,
+  SxProps,
+  Theme,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -26,10 +28,28 @@ import {
   TrendingUp as TrendingIcon,
 } from '@mui/icons-material';
 
-const SearchGuidance = ({ onExampleClick, compact = false, sx, ...props }) => {
-  const [showHelp, setShowHelp] = useState(false);
+interface SearchExample {
+  query: string;
+  description: string;
+  icon: React.ReactElement;
+}
 
-  const searchExamples = [
+interface SearchGuidanceProps {
+  onExampleClick?: (query: string) => void;
+  compact?: boolean;
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
+
+const SearchGuidance: React.FC<SearchGuidanceProps> = ({ 
+  onExampleClick, 
+  compact = false, 
+  sx, 
+  ...props 
+}) => {
+  const [showHelp, setShowHelp] = useState<boolean>(false);
+
+  const searchExamples: SearchExample[] = [
     {
       query: 'invoice 2024',
       description: 'Find documents containing both "invoice" and "2024"',
@@ -57,7 +77,7 @@ const SearchGuidance = ({ onExampleClick, compact = false, sx, ...props }) => {
     },
   ];
 
-  const searchTips = [
+  const searchTips: string[] = [
     'Use quotes for exact phrases: "annual report"',
     'Search by tags: tag:urgent or tag:personal',
     'Use AND/OR for complex queries: (invoice OR receipt) AND 2024',
@@ -65,6 +85,12 @@ const SearchGuidance = ({ onExampleClick, compact = false, sx, ...props }) => {
     'Search OCR text in images and PDFs automatically',
     'File types are searchable: PDF, Word, Excel, images',
   ];
+
+  const handleExampleClick = (query: string): void => {
+    if (onExampleClick) {
+      onExampleClick(query);
+    }
+  };
 
   if (compact) {
     return (
@@ -122,7 +148,7 @@ const SearchGuidance = ({ onExampleClick, compact = false, sx, ...props }) => {
                   size="small"
                   variant="outlined"
                   clickable
-                  onClick={() => onExampleClick?.(example.query)}
+                  onClick={() => handleExampleClick(example.query)}
                   sx={{ 
                     fontSize: '0.7rem',
                     height: 20,
@@ -160,11 +186,12 @@ const SearchGuidance = ({ onExampleClick, compact = false, sx, ...props }) => {
                 {searchExamples.map((example, index) => (
                   <ListItem
                     key={index}
-                    button
-                    onClick={() => onExampleClick?.(example.query)}
+                    component="div"
+                    onClick={() => handleExampleClick(example.query)}
                     sx={{
                       borderRadius: 1,
                       mb: 0.5,
+                      cursor: 'pointer',
                       '&:hover': {
                         backgroundColor: 'action.hover',
                       },
@@ -217,7 +244,7 @@ const SearchGuidance = ({ onExampleClick, compact = false, sx, ...props }) => {
                     size="small"
                     variant="outlined"
                     clickable
-                    onClick={() => onExampleClick?.(example.query)}
+                    onClick={() => handleExampleClick(example.query)}
                     sx={{
                       '&:hover': {
                         backgroundColor: 'primary.light',

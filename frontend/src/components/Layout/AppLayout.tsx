@@ -38,7 +38,22 @@ import GlobalSearchBar from '../GlobalSearchBar';
 
 const drawerWidth = 280;
 
-const navigationItems = [
+interface NavigationItem {
+  text: string;
+  icon: React.ComponentType<any>;
+  path: string;
+}
+
+interface AppLayoutProps {
+  children: React.ReactNode;
+}
+
+interface User {
+  username?: string;
+  email?: string;
+}
+
+const navigationItems: NavigationItem[] = [
   { text: 'Dashboard', icon: DashboardIcon, path: '/dashboard' },
   { text: 'Upload', icon: UploadIcon, path: '/upload' },
   { text: 'Documents', icon: DocumentIcon, path: '/documents' },
@@ -46,28 +61,28 @@ const navigationItems = [
   { text: 'Watch Folder', icon: FolderIcon, path: '/watch' },
 ];
 
-export default function AppLayout({ children }) {
+const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
+  const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const handleDrawerToggle = () => {
+  const handleDrawerToggle = (): void => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleProfileMenuOpen = (event) => {
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>): void => {
     setAnchorEl(event.currentTarget);
   };
 
-  const handleProfileMenuClose = () => {
+  const handleProfileMenuClose = (): void => {
     setAnchorEl(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     logout();
     handleProfileMenuClose();
     navigate('/login');
@@ -321,4 +336,6 @@ export default function AppLayout({ children }) {
       </Box>
     </Box>
   );
-}
+};
+
+export default AppLayout;

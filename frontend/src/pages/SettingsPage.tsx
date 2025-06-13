@@ -31,15 +31,65 @@ import {
   CardContent,
   Divider,
   Switch,
+  SelectChangeEvent,
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
-const SettingsPage = () => {
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  created_at: string;
+}
+
+interface Settings {
+  ocrLanguage: string;
+  concurrentOcrJobs: number;
+  ocrTimeoutSeconds: number;
+  maxFileSizeMb: number;
+  allowedFileTypes: string[];
+  autoRotateImages: boolean;
+  enableImagePreprocessing: boolean;
+  searchResultsPerPage: number;
+  searchSnippetLength: number;
+  fuzzySearchThreshold: number;
+  retentionDays: number | null;
+  enableAutoCleanup: boolean;
+  enableCompression: boolean;
+  memoryLimitMb: number;
+  cpuPriority: string;
+  enableBackgroundOcr: boolean;
+}
+
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error' | 'warning' | 'info';
+}
+
+interface UserDialogState {
+  open: boolean;
+  mode: 'create' | 'edit';
+  user: User | null;
+}
+
+interface UserFormData {
+  username: string;
+  email: string;
+  password: string;
+}
+
+interface OcrLanguage {
+  code: string;
+  name: string;
+}
+
+const SettingsPage: React.FC = () => {
   const { user: currentUser } = useAuth();
-  const [tabValue, setTabValue] = useState(0);
-  const [settings, setSettings] = useState({
+  const [tabValue, setTabValue] = useState<number>(0);
+  const [settings, setSettings] = useState<Settings>({
     ocrLanguage: 'eng',
     concurrentOcrJobs: 4,
     ocrTimeoutSeconds: 300,
@@ -57,13 +107,25 @@ const SettingsPage = () => {
     cpuPriority: 'normal',
     enableBackgroundOcr: true,
   });
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const [userDialog, setUserDialog] = useState({ open: false, mode: 'create', user: null });
-  const [userForm, setUserForm] = useState({ username: '', email: '', password: '' });
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [snackbar, setSnackbar] = useState<SnackbarState>({ 
+    open: false, 
+    message: '', 
+    severity: 'success' 
+  });
+  const [userDialog, setUserDialog] = useState<UserDialogState>({ 
+    open: false, 
+    mode: 'create', 
+    user: null 
+  });
+  const [userForm, setUserForm] = useState<UserFormData>({ 
+    username: '', 
+    email: '', 
+    password: '' 
+  });
 
-  const ocrLanguages = [
+  const ocrLanguages: OcrLanguage[] = [
     { code: 'eng', name: 'English' },
     { code: 'spa', name: 'Spanish' },
     { code: 'fra', name: 'French' },
@@ -86,7 +148,7 @@ const SettingsPage = () => {
     fetchUsers();
   }, []);
 
-  const fetchSettings = async () => {
+  const fetchSettings = async (): Promise<void> => {
     try {
       const response = await api.get('/settings');
       setSettings({
@@ -107,7 +169,7 @@ const SettingsPage = () => {
         cpuPriority: response.data.cpu_priority || 'normal',
         enableBackgroundOcr: response.data.enable_background_ocr !== undefined ? response.data.enable_background_ocr : true,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching settings:', error);
       if (error.response?.status !== 404) {
         showSnackbar('Failed to load settings', 'error');
@@ -115,11 +177,11 @@ const SettingsPage = () => {
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (): Promise<void> => {
     try {
-      const response = await api.get('/users');
+      const response = await api.get<User[]>('/users');
       setUsers(response.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching users:', error);
       if (error.response?.status !== 404) {
         showSnackbar('Failed to load users', 'error');
@@ -127,11 +189,11 @@ const SettingsPage = () => {
     }
   };
 
-  const handleSettingsChange = async (key, value) => {
+  const handleSettingsChange = async (key: keyof Settings, value: any): Promise<void> => {
     setLoading(true);
     try {
       // Convert camelCase to snake_case for API
-      const snakeCase = (str) => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      const snakeCase = (str: string): string => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
       const apiKey = snakeCase(key);
       
       // Build the update payload with only the changed field
@@ -148,7 +210,7 @@ const SettingsPage = () => {
     }
   };
 
-  const handleUserSubmit = async () => {
+  const handleUserSubmit = async (): Promise<void> => {
     setLoading(true);
     try {
       if (userDialog.mode === 'create') {
@@ -156,15 +218,16 @@ const SettingsPage = () => {
         showSnackbar('User created successfully', 'success');
       } else {
         const { password, ...updateData } = userForm;
+        const payload: any = updateData;
         if (password) {
-          updateData.password = password;
+          payload.password = password;
         }
-        await api.put(`/users/${userDialog.user.id}`, updateData);
+        await api.put(`/users/${userDialog.user?.id}`, payload);
         showSnackbar('User updated successfully', 'success');
       }
       fetchUsers();
       handleCloseUserDialog();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving user:', error);
       showSnackbar(error.response?.data?.message || 'Failed to save user', 'error');
     } finally {
@@ -172,8 +235,8 @@ const SettingsPage = () => {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (userId === currentUser.id) {
+  const handleDeleteUser = async (userId: string): Promise<void> => {
+    if (userId === currentUser?.id) {
       showSnackbar('You cannot delete your own account', 'error');
       return;
     }
@@ -193,7 +256,7 @@ const SettingsPage = () => {
     }
   };
 
-  const handleOpenUserDialog = (mode, user = null) => {
+  const handleOpenUserDialog = (mode: 'create' | 'edit', user: User | null = null): void => {
     setUserDialog({ open: true, mode, user });
     if (mode === 'edit' && user) {
       setUserForm({ username: user.username, email: user.email, password: '' });
@@ -202,17 +265,29 @@ const SettingsPage = () => {
     }
   };
 
-  const handleCloseUserDialog = () => {
+  const handleCloseUserDialog = (): void => {
     setUserDialog({ open: false, mode: 'create', user: null });
     setUserForm({ username: '', email: '', password: '' });
   };
 
-  const showSnackbar = (message, severity) => {
+  const showSnackbar = (message: string, severity: SnackbarState['severity']): void => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number): void => {
     setTabValue(newValue);
+  };
+
+  const handleOcrLanguageChange = (event: SelectChangeEvent<string>): void => {
+    handleSettingsChange('ocrLanguage', event.target.value);
+  };
+
+  const handleCpuPriorityChange = (event: SelectChangeEvent<string>): void => {
+    handleSettingsChange('cpuPriority', event.target.value);
+  };
+
+  const handleResultsPerPageChange = (event: SelectChangeEvent<number>): void => {
+    handleSettingsChange('searchResultsPerPage', event.target.value);
   };
 
   return (
@@ -247,7 +322,7 @@ const SettingsPage = () => {
                         <Select
                           value={settings.ocrLanguage}
                           label="OCR Language"
-                          onChange={(e) => handleSettingsChange('ocrLanguage', e.target.value)}
+                          onChange={handleOcrLanguageChange}
                           disabled={loading}
                         >
                           {ocrLanguages.map((lang) => (
@@ -288,7 +363,7 @@ const SettingsPage = () => {
                         <Select
                           value={settings.cpuPriority}
                           label="CPU Priority"
-                          onChange={(e) => handleSettingsChange('cpuPriority', e.target.value)}
+                          onChange={handleCpuPriorityChange}
                           disabled={loading}
                         >
                           <MenuItem value="low">Low</MenuItem>
@@ -400,7 +475,7 @@ const SettingsPage = () => {
                         <Select
                           value={settings.searchResultsPerPage}
                           label="Results Per Page"
-                          onChange={(e) => handleSettingsChange('searchResultsPerPage', parseInt(e.target.value))}
+                          onChange={handleResultsPerPageChange}
                           disabled={loading}
                         >
                           <MenuItem value={10}>10</MenuItem>
@@ -538,7 +613,7 @@ const SettingsPage = () => {
                           </IconButton>
                           <IconButton
                             onClick={() => handleDeleteUser(user.id)}
-                            disabled={loading || user.id === currentUser.id}
+                            disabled={loading || user.id === currentUser?.id}
                           >
                             <DeleteIcon />
                           </IconButton>

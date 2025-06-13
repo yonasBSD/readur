@@ -20,14 +20,19 @@ import {
   Lock as LockIcon,
   CloudUpload as LogoIcon,
 } from '@mui/icons-material';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-export default function Login() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+interface LoginFormData {
+  username: string;
+  password: string;
+}
+
+const Login: React.FC = () => {
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   
@@ -35,9 +40,9 @@ export default function Login() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm();
+  } = useForm<LoginFormData>();
 
-  const onSubmit = async (data) => {
+  const onSubmit: SubmitHandler<LoginFormData> = async (data) => {
     try {
       setError('');
       setLoading(true);
@@ -50,7 +55,7 @@ export default function Login() {
     }
   };
 
-  const handleClickShowPassword = () => {
+  const handleClickShowPassword = (): void => {
     setShowPassword(!showPassword);
   };
 
@@ -248,4 +253,6 @@ export default function Login() {
       </Container>
     </Box>
   );
-}
+};
+
+export default Login;

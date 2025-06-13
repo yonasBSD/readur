@@ -30,17 +30,26 @@ import {
   Description as DescriptionIcon,
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
-import { queueService } from '../services/api';
+import { queueService, QueueStats } from '../services/api';
 
-const WatchFolderPage = () => {
+interface WatchConfig {
+  watchFolder: string;
+  watchInterval: number;
+  maxFileAge: number;
+  allowedTypes: string[];
+  isActive: boolean;
+  strategy: string;
+}
+
+const WatchFolderPage: React.FC = () => {
   const theme = useTheme();
-  const [queueStats, setQueueStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastRefresh, setLastRefresh] = useState(null);
+  const [queueStats, setQueueStats] = useState<QueueStats | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   // Mock configuration data (would typically come from API)
-  const watchConfig = {
+  const watchConfig: WatchConfig = {
     watchFolder: process.env.REACT_APP_WATCH_FOLDER || './watch',
     watchInterval: 30,
     maxFileAge: 24,
@@ -55,7 +64,7 @@ const WatchFolderPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchQueueStats = async () => {
+  const fetchQueueStats = async (): Promise<void> => {
     try {
       setLoading(true);
       const response = await queueService.getStats();
@@ -70,7 +79,7 @@ const WatchFolderPage = () => {
     }
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -78,7 +87,7 @@ const WatchFolderPage = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const formatDuration = (minutes) => {
+  const formatDuration = (minutes: number | null | undefined): string => {
     if (!minutes) return 'N/A';
     if (minutes < 60) return `${Math.round(minutes)}m`;
     const hours = Math.floor(minutes / 60);
@@ -86,7 +95,7 @@ const WatchFolderPage = () => {
     return `${hours}h ${mins}m`;
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string): 'success' | 'error' | 'warning' | 'default' => {
     switch (status) {
       case 'active': return 'success';
       case 'error': return 'error';
@@ -95,7 +104,7 @@ const WatchFolderPage = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string): JSX.Element => {
     switch (status) {
       case 'active': return <CheckCircleIcon />;
       case 'error': return <ErrorIcon />;

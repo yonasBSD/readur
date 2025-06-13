@@ -18,6 +18,8 @@ import {
   CircularProgress,
   LinearProgress,
   Skeleton,
+  SxProps,
+  Theme,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -30,21 +32,43 @@ import {
   AccessTime as TimeIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { documentService } from '../../services/api';
+import { documentService, SearchRequest } from '../../services/api';
 
-const GlobalSearchBar = ({ sx, ...props }) => {
+interface GlobalSearchBarProps {
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
+
+interface Document {
+  id: string;
+  original_filename: string;
+  filename?: string;
+  file_size: number;
+  mime_type: string;
+  has_ocr_text?: boolean;
+  search_rank?: number;
+  snippets?: Array<{ text: string }>;
+}
+
+interface SearchResponse {
+  documents: Document[];
+  total_count: number;
+  search_time_ms: number;
+}
+
+const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
   const navigate = useNavigate();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [recentSearches, setRecentSearches] = useState([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const [searchProgress, setSearchProgress] = useState(0);
-  const [suggestions, setSuggestions] = useState([]);
-  const [popularSearches] = useState(['invoice', 'contract', 'report', 'presentation', 'agreement']);
-  const searchInputRef = useRef(null);
-  const anchorRef = useRef(null);
+  const [query, setQuery] = useState<string>('');
+  const [results, setResults] = useState<Document[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [showResults, setShowResults] = useState<boolean>(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+  const [searchProgress, setSearchProgress] = useState<number>(0);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [popularSearches] = useState<string[]>(['invoice', 'contract', 'report', 'presentation', 'agreement']);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -59,7 +83,7 @@ const GlobalSearchBar = ({ sx, ...props }) => {
   }, []);
 
   // Save recent searches to localStorage
-  const saveRecentSearch = useCallback((searchQuery) => {
+  const saveRecentSearch = useCallback((searchQuery: string): void => {
     if (!searchQuery.trim()) return;
     
     const updated = [
@@ -72,9 +96,9 @@ const GlobalSearchBar = ({ sx, ...props }) => {
   }, [recentSearches]);
 
   // Enhanced debounced search function with typing indicators
-  const debounce = useCallback((func, delay) => {
-    let timeoutId;
-    return (...args) => {
+  const debounce = useCallback((func: (...args: any[]) => void, delay: number) => {
+    let timeoutId: NodeJS.Timeout;
+    return (...args: any[]) => {
       clearTimeout(timeoutId);
       setIsTyping(true);
       timeoutId = setTimeout(() => {
@@ -85,13 +109,13 @@ const GlobalSearchBar = ({ sx, ...props }) => {
   }, []);
 
   // Generate smart suggestions
-  const generateSuggestions = useCallback((searchQuery) => {
+  const generateSuggestions = useCallback((searchQuery: string): void => {
     if (!searchQuery || searchQuery.length < 2) {
       setSuggestions([]);
       return;
     }
     
-    const smartSuggestions = [];
+    const smartSuggestions: string[] = [];
     
     // Add similar popular searches
     const similar = popularSearches.filter(search => 
@@ -113,7 +137,7 @@ const GlobalSearchBar = ({ sx, ...props }) => {
     setSuggestions(smartSuggestions.slice(0, 3));
   }, [popularSearches]);
 
-  const performSearch = useCallback(async (searchQuery) => {
+  const performSearch = useCallback(async (searchQuery: string): Promise<void> => {
     if (!searchQuery.trim()) {
       setResults([]);
       setSuggestions([]);
@@ -129,13 +153,15 @@ const GlobalSearchBar = ({ sx, ...props }) => {
         setSearchProgress(prev => Math.min(prev + 25, 90));
       }, 50);
       
-      const response = await documentService.enhancedSearch({
+      const searchRequest: SearchRequest = {
         query: searchQuery.trim(),
         limit: 5, // Show only top 5 results in global search
         include_snippets: true, // Include snippets for context
         snippet_length: 100, // Shorter snippets for quick search
         search_mode: searchQuery.length < 4 ? 'fuzzy' : 'simple', // Use fuzzy for short queries (substring matching)
-      });
+      };
+
+      const response = await documentService.enhancedSearch(searchRequest);
 
       clearInterval(progressInterval);
       setSearchProgress(100);
@@ -162,7 +188,7 @@ const GlobalSearchBar = ({ sx, ...props }) => {
     [generateSuggestions]
   );
 
-  const handleInputChange = (event) => {
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const value = event.target.value;
     setQuery(value);
     setShowResults(true);
@@ -176,15 +202,15 @@ const GlobalSearchBar = ({ sx, ...props }) => {
     }
   };
 
-  const handleInputFocus = () => {
+  const handleInputFocus = (): void => {
     setShowResults(true);
   };
 
-  const handleClickAway = () => {
+  const handleClickAway = (): void => {
     setShowResults(false);
   };
 
-  const handleClear = () => {
+  const handleClear = (): void => {
     setQuery('');
     setResults([]);
     setSuggestions([]);
@@ -193,29 +219,29 @@ const GlobalSearchBar = ({ sx, ...props }) => {
     setSearchProgress(0);
   };
 
-  const handleDocumentClick = (doc) => {
+  const handleDocumentClick = (doc: Document): void => {
     saveRecentSearch(query);
     setShowResults(false);
     navigate(`/documents/${doc.id}`);
   };
 
-  const handleRecentSearchClick = (searchQuery) => {
+  const handleRecentSearchClick = (searchQuery: string): void => {
     setQuery(searchQuery);
     performSearch(searchQuery);
   };
   
-  const handleSuggestionClick = (suggestion) => {
+  const handleSuggestionClick = (suggestion: string): void => {
     setQuery(suggestion);
     performSearch(suggestion);
   };
   
-  const handlePopularSearchClick = (search) => {
+  const handlePopularSearchClick = (search: string): void => {
     setQuery(search);
     performSearch(search);
     setShowResults(false);
   };
 
-  const handleKeyDown = (event) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === 'Enter' && query.trim()) {
       saveRecentSearch(query);
       setShowResults(false);
@@ -227,14 +253,14 @@ const GlobalSearchBar = ({ sx, ...props }) => {
     }
   };
 
-  const getFileIcon = (mimeType) => {
+  const getFileIcon = (mimeType: string): React.ReactElement => {
     if (mimeType.includes('pdf')) return <PdfIcon color="error" />;
     if (mimeType.includes('image')) return <ImageIcon color="primary" />;
     if (mimeType.includes('text')) return <TextIcon color="info" />;
     return <DocIcon color="secondary" />;
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number): string => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 Bytes';
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
@@ -242,7 +268,7 @@ const GlobalSearchBar = ({ sx, ...props }) => {
   };
 
   // Function to highlight search terms in text (including substrings)
-  const highlightText = useCallback((text, searchTerm) => {
+  const highlightText = useCallback((text: string, searchTerm: string): React.ReactNode => {
     if (!searchTerm || !text) return text;
     
     const terms = searchTerm.toLowerCase().split(/\s+/).filter(term => term.length >= 2);
@@ -280,7 +306,7 @@ const GlobalSearchBar = ({ sx, ...props }) => {
   }, []);
 
   // Enhanced search with context snippets
-  const generateContextSnippet = useCallback((filename, searchTerm) => {
+  const generateContextSnippet = useCallback((filename: string, searchTerm: string): string => {
     if (!searchTerm || !filename) return filename;
     
     const lowerFilename = filename.toLowerCase();
@@ -483,10 +509,11 @@ const GlobalSearchBar = ({ sx, ...props }) => {
                       {results.map((doc) => (
                         <ListItem
                           key={doc.id}
-                          button
+                          component="div"
                           onClick={() => handleDocumentClick(doc)}
                           sx={{
                             py: 1,
+                            cursor: 'pointer',
                             '&:hover': {
                               backgroundColor: 'action.hover',
                             },
@@ -592,10 +619,11 @@ const GlobalSearchBar = ({ sx, ...props }) => {
                       {recentSearches.map((search, index) => (
                         <ListItem
                           key={index}
-                          button
+                          component="div"
                           onClick={() => handleRecentSearchClick(search)}
                           sx={{
                             py: 1,
+                            cursor: 'pointer',
                             '&:hover': {
                               backgroundColor: 'action.hover',
                             },

@@ -41,26 +41,41 @@ import {
 } from '@mui/icons-material';
 import { documentService } from '../services/api';
 
-const DocumentsPage = () => {
+interface Document {
+  id: string;
+  original_filename: string;
+  filename?: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+  has_ocr_text?: boolean;
+  tags: string[];
+}
+
+type ViewMode = 'grid' | 'list';
+type SortField = 'created_at' | 'original_filename' | 'file_size';
+type SortOrder = 'asc' | 'desc';
+
+const DocumentsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<SortField>('created_at');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   
   // Menu states
-  const [sortMenuAnchor, setSortMenuAnchor] = useState(null);
-  const [docMenuAnchor, setDocMenuAnchor] = useState(null);
-  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [sortMenuAnchor, setSortMenuAnchor] = useState<null | HTMLElement>(null);
+  const [docMenuAnchor, setDocMenuAnchor] = useState<null | HTMLElement>(null);
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
   useEffect(() => {
     fetchDocuments();
   }, []);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (): Promise<void> => {
     try {
       setLoading(true);
       const response = await documentService.list(100, 0);
@@ -73,7 +88,7 @@ const DocumentsPage = () => {
     }
   };
 
-  const handleDownload = async (doc) => {
+  const handleDownload = async (doc: Document): Promise<void> => {
     try {
       const response = await documentService.download(doc.id);
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -89,21 +104,21 @@ const DocumentsPage = () => {
     }
   };
 
-  const getFileIcon = (mimeType) => {
+  const getFileIcon = (mimeType: string): React.ReactElement => {
     if (mimeType.includes('pdf')) return <PdfIcon color="error" />;
     if (mimeType.includes('image')) return <ImageIcon color="primary" />;
     if (mimeType.includes('text')) return <TextIcon color="info" />;
     return <DocIcon color="secondary" />;
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number): string => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 Bytes';
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -119,8 +134,8 @@ const DocumentsPage = () => {
   );
 
   const sortedDocuments = [...filteredDocuments].sort((a, b) => {
-    let aValue = a[sortBy];
-    let bValue = b[sortBy];
+    let aValue: any = a[sortBy];
+    let bValue: any = b[sortBy];
     
     if (sortBy === 'created_at') {
       aValue = new Date(aValue);
@@ -133,6 +148,35 @@ const DocumentsPage = () => {
       return aValue < bValue ? 1 : -1;
     }
   });
+
+  const handleViewModeChange = (event: React.MouseEvent<HTMLElement>, newView: ViewMode | null): void => {
+    if (newView) {
+      setViewMode(newView);
+    }
+  };
+
+  const handleSortMenuClick = (event: React.MouseEvent<HTMLElement>): void => {
+    setSortMenuAnchor(event.currentTarget);
+  };
+
+  const handleDocMenuClick = (event: React.MouseEvent<HTMLElement>, doc: Document): void => {
+    setSelectedDoc(doc);
+    setDocMenuAnchor(event.currentTarget);
+  };
+
+  const handleSortMenuClose = (): void => {
+    setSortMenuAnchor(null);
+  };
+
+  const handleDocMenuClose = (): void => {
+    setDocMenuAnchor(null);
+  };
+
+  const handleSortChange = (field: SortField, order: SortOrder): void => {
+    setSortBy(field);
+    setSortOrder(order);
+    handleSortMenuClose();
+  };
 
   if (loading) {
     return (
@@ -201,7 +245,7 @@ const DocumentsPage = () => {
         <ToggleButtonGroup
           value={viewMode}
           exclusive
-          onChange={(e, newView) => newView && setViewMode(newView)}
+          onChange={handleViewModeChange}
           size="small"
         >
           <ToggleButton value="grid">
@@ -216,7 +260,7 @@ const DocumentsPage = () => {
         <Button
           variant="outlined"
           startIcon={<SortIcon />}
-          onClick={(e) => setSortMenuAnchor(e.currentTarget)}
+          onClick={handleSortMenuClick}
           size="small"
         >
           Sort
@@ -227,29 +271,29 @@ const DocumentsPage = () => {
       <Menu
         anchorEl={sortMenuAnchor}
         open={Boolean(sortMenuAnchor)}
-        onClose={() => setSortMenuAnchor(null)}
+        onClose={handleSortMenuClose}
       >
-        <MenuItem onClick={() => { setSortBy('created_at'); setSortOrder('desc'); setSortMenuAnchor(null); }}>
+        <MenuItem onClick={() => handleSortChange('created_at', 'desc')}>
           <ListItemIcon><DateIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Newest First</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => { setSortBy('created_at'); setSortOrder('asc'); setSortMenuAnchor(null); }}>
+        <MenuItem onClick={() => handleSortChange('created_at', 'asc')}>
           <ListItemIcon><DateIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Oldest First</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => { setSortBy('original_filename'); setSortOrder('asc'); setSortMenuAnchor(null); }}>
+        <MenuItem onClick={() => handleSortChange('original_filename', 'asc')}>
           <ListItemIcon><TextIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Name A-Z</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => { setSortBy('original_filename'); setSortOrder('desc'); setSortMenuAnchor(null); }}>
+        <MenuItem onClick={() => handleSortChange('original_filename', 'desc')}>
           <ListItemIcon><TextIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Name Z-A</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => { setSortBy('file_size'); setSortOrder('desc'); setSortMenuAnchor(null); }}>
+        <MenuItem onClick={() => handleSortChange('file_size', 'desc')}>
           <ListItemIcon><SizeIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Largest First</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => { setSortBy('file_size'); setSortOrder('asc'); setSortMenuAnchor(null); }}>
+        <MenuItem onClick={() => handleSortChange('file_size', 'asc')}>
           <ListItemIcon><SizeIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Smallest First</ListItemText>
         </MenuItem>
@@ -259,15 +303,18 @@ const DocumentsPage = () => {
       <Menu
         anchorEl={docMenuAnchor}
         open={Boolean(docMenuAnchor)}
-        onClose={() => setDocMenuAnchor(null)}
+        onClose={handleDocMenuClose}
       >
-        <MenuItem onClick={() => { handleDownload(selectedDoc); setDocMenuAnchor(null); }}>
+        <MenuItem onClick={() => { 
+          if (selectedDoc) handleDownload(selectedDoc); 
+          handleDocMenuClose(); 
+        }}>
           <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Download</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => { 
-          navigate(`/documents/${selectedDoc.id}`); 
-          setDocMenuAnchor(null); 
+          if (selectedDoc) navigate(`/documents/${selectedDoc.id}`); 
+          handleDocMenuClose(); 
         }}>
           <ListItemIcon><ViewIcon fontSize="small" /></ListItemIcon>
           <ListItemText>View Details</ListItemText>
@@ -402,10 +449,7 @@ const DocumentsPage = () => {
                     
                     <IconButton
                       size="small"
-                      onClick={(e) => {
-                        setSelectedDoc(doc);
-                        setDocMenuAnchor(e.currentTarget);
-                      }}
+                      onClick={(e) => handleDocMenuClick(e, doc)}
                     >
                       <MoreIcon />
                     </IconButton>

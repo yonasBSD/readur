@@ -35,6 +35,7 @@ import {
   Switch,
   Paper,
   Skeleton,
+  SelectChangeEvent,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -57,25 +58,72 @@ import {
   AccessTime as TimeIcon,
   TrendingUp as TrendingIcon,
 } from '@mui/icons-material';
-import { documentService } from '../services/api';
+import { documentService, SearchRequest } from '../services/api';
 import SearchGuidance from '../components/SearchGuidance';
 
-const SearchPage = () => {
+interface Document {
+  id: string;
+  original_filename: string;
+  filename?: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+  has_ocr_text?: boolean;
+  tags: string[];
+  snippets?: Snippet[];
+  search_rank?: number;
+}
+
+interface Snippet {
+  text: string;
+  highlight_ranges?: HighlightRange[];
+}
+
+interface HighlightRange {
+  start: number;
+  end: number;
+}
+
+interface SearchResponse {
+  documents: Document[];
+  total: number;
+  query_time_ms: number;
+  suggestions?: string[];
+}
+
+interface MimeTypeOption {
+  value: string;
+  label: string;
+}
+
+interface SearchFilters {
+  tags?: string[];
+  mimeTypes?: string[];
+  dateRange?: number[];
+  fileSizeRange?: number[];
+  hasOcr?: string;
+}
+
+type ViewMode = 'grid' | 'list';
+type SearchMode = 'simple' | 'phrase' | 'fuzzy' | 'boolean';
+type OcrStatus = 'all' | 'yes' | 'no';
+
+const SearchPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-  const [searchResults, setSearchResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid');
-  const [queryTime, setQueryTime] = useState(0);
-  const [totalResults, setTotalResults] = useState(0);
-  const [suggestions, setSuggestions] = useState([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const [searchProgress, setSearchProgress] = useState(0);
-  const [quickSuggestions, setQuickSuggestions] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
-  const [searchTips, setSearchTips] = useState([
+  const [searchQuery, setSearchQuery] = useState<string>(searchParams.get('q') || '');
+  const [searchResults, setSearchResults] = useState<Document[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [queryTime, setQueryTime] = useState<number>(0);
+  const [totalResults, setTotalResults] = useState<number>(0);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+  const [searchProgress, setSearchProgress] = useState<number>(0);
+  const [quickSuggestions, setQuickSuggestions] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [searchTips] = useState<string[]>([
     'Use quotes for exact phrases: "project plan"',
     'Search by tags: tag:important or tag:invoice', 
     'Combine terms: contract AND payment',
@@ -83,22 +131,22 @@ const SearchPage = () => {
   ]);
   
   // Search settings
-  const [useEnhancedSearch, setUseEnhancedSearch] = useState(true);
-  const [searchMode, setSearchMode] = useState('simple');
-  const [includeSnippets, setIncludeSnippets] = useState(true);
-  const [snippetLength, setSnippetLength] = useState(200);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [useEnhancedSearch, setUseEnhancedSearch] = useState<boolean>(true);
+  const [searchMode, setSearchMode] = useState<SearchMode>('simple');
+  const [includeSnippets, setIncludeSnippets] = useState<boolean>(true);
+  const [snippetLength, setSnippetLength] = useState<number>(200);
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   
   // Filter states
-  const [selectedTags, setSelectedTags] = useState([]);
-  const [selectedMimeTypes, setSelectedMimeTypes] = useState([]);
-  const [dateRange, setDateRange] = useState([0, 365]); // days
-  const [fileSizeRange, setFileSizeRange] = useState([0, 100]); // MB
-  const [hasOcr, setHasOcr] = useState('all');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedMimeTypes, setSelectedMimeTypes] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<number[]>([0, 365]); // days
+  const [fileSizeRange, setFileSizeRange] = useState<number[]>([0, 100]); // MB
+  const [hasOcr, setHasOcr] = useState<OcrStatus>('all');
   
   // Available options (would typically come from API)
-  const [availableTags, setAvailableTags] = useState([]);
-  const mimeTypeOptions = [
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const mimeTypeOptions: MimeTypeOption[] = [
     { value: 'application/pdf', label: 'PDF' },
     { value: 'image/', label: 'Images' },
     { value: 'text/', label: 'Text Files' },
@@ -107,9 +155,9 @@ const SearchPage = () => {
   ];
 
   // Enhanced debounced search with typing indicators
-  const debounce = useCallback((func, delay) => {
-    let timeoutId;
-    return (...args) => {
+  const debounce = useCallback((func: (...args: any[]) => void, delay: number) => {
+    let timeoutId: NodeJS.Timeout;
+    return (...args: any[]) => {
       clearTimeout(timeoutId);
       setIsTyping(true);
       timeoutId = setTimeout(() => {
@@ -120,13 +168,13 @@ const SearchPage = () => {
   }, []);
 
   // Quick suggestions generator
-  const generateQuickSuggestions = useCallback((query) => {
+  const generateQuickSuggestions = useCallback((query: string): void => {
     if (!query || query.length < 2) {
       setQuickSuggestions([]);
       return;
     }
     
-    const suggestions = [];
+    const suggestions: string[] = [];
     
     // Add exact phrase suggestion
     if (!query.includes('"')) {
@@ -146,7 +194,7 @@ const SearchPage = () => {
     setQuickSuggestions(suggestions.slice(0, 3));
   }, []);
 
-  const performSearch = useCallback(async (query, filters = {}) => {
+  const performSearch = useCallback(async (query: string, filters: SearchFilters = {}): Promise<void> => {
     if (!query.trim()) {
       setSearchResults([]);
       setTotalResults(0);
@@ -166,7 +214,7 @@ const SearchPage = () => {
         setSearchProgress(prev => Math.min(prev + 20, 90));
       }, 100);
       
-      const searchRequest = {
+      const searchRequest: SearchRequest = {
         query: query.trim(),
         tags: filters.tags?.length ? filters.tags : undefined,
         mime_types: filters.mimeTypes?.length ? filters.mimeTypes : undefined,
@@ -190,7 +238,7 @@ const SearchPage = () => {
         const [minDays, maxDays] = filters.dateRange;
         results = results.filter(doc => {
           const docDate = new Date(doc.created_at);
-          const daysDiff = Math.ceil((now - docDate) / (1000 * 60 * 60 * 24));
+          const daysDiff = Math.ceil((now.getTime() - docDate.getTime()) / (1000 * 60 * 60 * 24));
           return daysDiff >= minDays && daysDiff <= maxDays;
         });
       }
@@ -237,12 +285,12 @@ const SearchPage = () => {
   }, [useEnhancedSearch, includeSnippets, snippetLength, searchMode]);
 
   const debouncedSearch = useCallback(
-    debounce((query, filters) => performSearch(query, filters), 300),
+    debounce((query: string, filters: SearchFilters) => performSearch(query, filters), 300),
     [performSearch]
   );
   
   const quickSuggestionsDebounced = useCallback(
-    debounce((query) => generateQuickSuggestions(query), 150),
+    debounce((query: string) => generateQuickSuggestions(query), 150),
     [generateQuickSuggestions]
   );
 
@@ -255,7 +303,7 @@ const SearchPage = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    const filters = {
+    const filters: SearchFilters = {
       tags: selectedTags,
       mimeTypes: selectedMimeTypes,
       dateRange: dateRange,
@@ -273,7 +321,7 @@ const SearchPage = () => {
     }
   }, [searchQuery, selectedTags, selectedMimeTypes, dateRange, fileSizeRange, hasOcr, debouncedSearch, quickSuggestionsDebounced, setSearchParams]);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = (): void => {
     setSelectedTags([]);
     setSelectedMimeTypes([]);
     setDateRange([0, 365]);
@@ -281,21 +329,21 @@ const SearchPage = () => {
     setHasOcr('all');
   };
 
-  const getFileIcon = (mimeType) => {
+  const getFileIcon = (mimeType: string): React.ReactElement => {
     if (mimeType.includes('pdf')) return <PdfIcon color="error" />;
     if (mimeType.includes('image')) return <ImageIcon color="primary" />;
     if (mimeType.includes('text')) return <TextIcon color="info" />;
     return <DocIcon color="secondary" />;
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number): string => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 Bytes';
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -303,7 +351,7 @@ const SearchPage = () => {
     });
   };
 
-  const handleDownload = async (doc) => {
+  const handleDownload = async (doc: Document): Promise<void> => {
     try {
       const response = await documentService.download(doc.id);
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -319,12 +367,12 @@ const SearchPage = () => {
     }
   };
 
-  const renderHighlightedText = (text, highlightRanges) => {
+  const renderHighlightedText = (text: string, highlightRanges?: HighlightRange[]): React.ReactNode => {
     if (!highlightRanges || highlightRanges.length === 0) {
       return text;
     }
 
-    const parts = [];
+    const parts: React.ReactNode[] = [];
     let lastIndex = 0;
 
     highlightRanges.forEach((range, index) => {
@@ -369,8 +417,38 @@ const SearchPage = () => {
     return parts;
   };
 
-  const handleSuggestionClick = (suggestion) => {
+  const handleSuggestionClick = (suggestion: string): void => {
     setSearchQuery(suggestion);
+  };
+
+  const handleViewModeChange = (event: React.MouseEvent<HTMLElement>, newView: ViewMode | null): void => {
+    if (newView) {
+      setViewMode(newView);
+    }
+  };
+
+  const handleSearchModeChange = (event: React.MouseEvent<HTMLElement>, newMode: SearchMode | null): void => {
+    if (newMode) {
+      setSearchMode(newMode);
+    }
+  };
+
+  const handleTagsChange = (event: SelectChangeEvent<string[]>): void => {
+    const value = event.target.value;
+    setSelectedTags(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const handleMimeTypesChange = (event: SelectChangeEvent<string[]>): void => {
+    const value = event.target.value;
+    setSelectedMimeTypes(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const handleOcrChange = (event: SelectChangeEvent<OcrStatus>): void => {
+    setHasOcr(event.target.value as OcrStatus);
+  };
+
+  const handleSnippetLengthChange = (event: SelectChangeEvent<number>): void => {
+    setSnippetLength(event.target.value as number);
   };
 
   return (
@@ -529,7 +607,7 @@ const SearchPage = () => {
               <ToggleButtonGroup
                 value={searchMode}
                 exclusive
-                onChange={(e, newMode) => newMode && setSearchMode(newMode)}
+                onChange={handleSearchModeChange}
                 size="small"
               >
                 <ToggleButton value="simple">Smart</ToggleButton>
@@ -633,7 +711,7 @@ const SearchPage = () => {
                         <InputLabel>Snippet Length</InputLabel>
                         <Select
                           value={snippetLength}
-                          onChange={(e) => setSnippetLength(e.target.value)}
+                          onChange={handleSnippetLengthChange}
                           label="Snippet Length"
                         >
                           <MenuItem value={100}>Short (100)</MenuItem>
@@ -707,7 +785,7 @@ const SearchPage = () => {
                       <Select
                         multiple
                         value={selectedTags}
-                        onChange={(e) => setSelectedTags(e.target.value)}
+                        onChange={handleTagsChange}
                         input={<OutlinedInput label="Select Tags" />}
                         renderValue={(selected) => (
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -739,7 +817,7 @@ const SearchPage = () => {
                       <Select
                         multiple
                         value={selectedMimeTypes}
-                        onChange={(e) => setSelectedMimeTypes(e.target.value)}
+                        onChange={handleMimeTypesChange}
                         input={<OutlinedInput label="Select Types" />}
                         renderValue={(selected) => (
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -773,7 +851,7 @@ const SearchPage = () => {
                       <InputLabel>OCR Text</InputLabel>
                       <Select
                         value={hasOcr}
-                        onChange={(e) => setHasOcr(e.target.value)}
+                        onChange={handleOcrChange}
                         label="OCR Text"
                       >
                         <MenuItem value="all">All Documents</MenuItem>
@@ -795,7 +873,7 @@ const SearchPage = () => {
                     </Typography>
                     <Slider
                       value={dateRange}
-                      onChange={(e, newValue) => setDateRange(newValue)}
+                      onChange={(e, newValue) => setDateRange(newValue as number[])}
                       valueLabelDisplay="auto"
                       min={0}
                       max={365}
@@ -820,7 +898,7 @@ const SearchPage = () => {
                     </Typography>
                     <Slider
                       value={fileSizeRange}
-                      onChange={(e, newValue) => setFileSizeRange(newValue)}
+                      onChange={(e, newValue) => setFileSizeRange(newValue as number[])}
                       valueLabelDisplay="auto"
                       min={0}
                       max={100}
@@ -856,7 +934,7 @@ const SearchPage = () => {
               <ToggleButtonGroup
                 value={viewMode}
                 exclusive
-                onChange={(e, newView) => newView && setViewMode(newView)}
+                onChange={handleViewModeChange}
                 size="small"
               >
                 <ToggleButton value="grid">

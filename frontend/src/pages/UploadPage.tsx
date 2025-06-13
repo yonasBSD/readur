@@ -23,7 +23,22 @@ import {
 import UploadZone from '../components/Upload/UploadZone';
 import { useNavigate } from 'react-router-dom';
 
-const features = [
+interface Feature {
+  icon: React.ComponentType<any>;
+  title: string;
+  description: string;
+}
+
+interface UploadedDocument {
+  id: string;
+  original_filename: string;
+  filename: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+}
+
+const features: Feature[] = [
   {
     icon: AutoIcon,
     title: 'AI-Powered OCR',
@@ -51,10 +66,10 @@ const features = [
   },
 ];
 
-export default function UploadPage() {
+const UploadPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const handleUploadComplete = (document) => {
+  const handleUploadComplete = (document: UploadedDocument): void => {
     // Optionally navigate to the document or show a success message
     console.log('Upload completed:', document);
   };
@@ -153,4 +168,6 @@ export default function UploadPage() {
       </Grid>
     </Container>
   );
-}
+};
+
+export default UploadPage;

@@ -40,8 +40,47 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 
+interface Document {
+  id: string;
+  original_filename?: string;
+  filename?: string;
+  file_size?: number;
+  mime_type?: string;
+  created_at?: string;
+  ocr_text?: string;
+  has_ocr_text?: boolean;
+}
+
+interface DashboardStats {
+  totalDocuments: number;
+  totalSize: number;
+  ocrProcessed: number;
+  searchablePages: number;
+}
+
+interface StatsCardProps {
+  title: string;
+  value: string | number;
+  subtitle: string;
+  icon: React.ComponentType<any>;
+  color: string;
+  trend?: string;
+}
+
+interface RecentDocumentsProps {
+  documents: Document[];
+}
+
+interface QuickAction {
+  title: string;
+  description: string;
+  icon: React.ComponentType<any>;
+  color: string;
+  path: string;
+}
+
 // Stats Card Component
-const StatsCard = ({ title, value, subtitle, icon: Icon, color, trend }) => {
+const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon: Icon, color, trend }) => {
   const theme = useTheme();
   
   return (
@@ -102,17 +141,17 @@ const StatsCard = ({ title, value, subtitle, icon: Icon, color, trend }) => {
 };
 
 // Recent Documents Component
-const RecentDocuments = ({ documents = [] }) => {
+const RecentDocuments: React.FC<RecentDocumentsProps> = ({ documents = [] }) => {
   const navigate = useNavigate();
 
-  const getFileIcon = (mimeType) => {
+  const getFileIcon = (mimeType?: string): React.ComponentType<any> => {
     if (mimeType?.includes('pdf')) return PdfIcon;
     if (mimeType?.includes('image')) return ImageIcon;
     if (mimeType?.includes('text')) return TextIcon;
     return FileIcon;
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes?: number): string => {
     if (!bytes) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
@@ -120,7 +159,7 @@ const RecentDocuments = ({ documents = [] }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString?: string): string => {
     if (!dateString) return 'Unknown';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -228,10 +267,10 @@ const RecentDocuments = ({ documents = [] }) => {
 };
 
 // Quick Actions Component
-const QuickActions = () => {
+const QuickActions: React.FC = () => {
   const navigate = useNavigate();
   
-  const actions = [
+  const actions: QuickAction[] = [
     {
       title: 'Upload Documents',
       description: 'Add new files for OCR processing',
@@ -310,23 +349,23 @@ const QuickActions = () => {
   );
 };
 
-export default function Dashboard() {
+const Dashboard: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [documents, setDocuments] = useState([]);
-  const [stats, setStats] = useState({
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
     totalDocuments: 0,
     totalSize: 0,
     ocrProcessed: 0,
     searchablePages: 0,
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = async (): Promise<void> => {
       try {
-        const response = await api.get('/documents');
+        const response = await api.get<Document[]>('/documents');
         const docs = response.data || [];
         setDocuments(docs);
         
@@ -350,7 +389,7 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  const formatBytes = (bytes) => {
+  const formatBytes = (bytes: number): string => {
     if (!bytes) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -442,4 +481,6 @@ export default function Dashboard() {
       </Fab>
     </Box>
   );
-}
+};
+
+export default Dashboard;
