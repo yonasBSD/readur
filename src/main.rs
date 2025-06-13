@@ -43,6 +43,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     db.migrate().await?;
     
+    // Run automatic migrations
+    if let Err(e) = readur::migrations::run_startup_migrations(&config.database_url, "migrations").await {
+        error!("Failed to run migrations: {}", e);
+        return Err(e.into());
+    }
+    
     // Seed admin user
     seed::seed_admin_user(&db).await?;
     

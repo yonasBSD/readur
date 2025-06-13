@@ -50,6 +50,10 @@ pub struct Document {
     pub mime_type: String,
     pub content: Option<String>,
     pub ocr_text: Option<String>,
+    pub ocr_confidence: Option<f32>,
+    pub ocr_word_count: Option<i32>,
+    pub ocr_processing_time_ms: Option<i32>,
+    pub ocr_status: Option<String>,
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -66,6 +70,10 @@ pub struct DocumentResponse {
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub has_ocr_text: bool,
+    pub ocr_confidence: Option<f32>,
+    pub ocr_word_count: Option<i32>,
+    pub ocr_processing_time_ms: Option<i32>,
+    pub ocr_status: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, IntoParams)]
@@ -122,6 +130,10 @@ pub struct EnhancedDocumentResponse {
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub has_ocr_text: bool,
+    pub ocr_confidence: Option<f32>,
+    pub ocr_word_count: Option<i32>,
+    pub ocr_processing_time_ms: Option<i32>,
+    pub ocr_status: Option<String>,
     pub search_rank: Option<f32>,
     pub snippets: Vec<SearchSnippet>,
 }
@@ -145,6 +157,10 @@ impl From<Document> for DocumentResponse {
             tags: doc.tags,
             created_at: doc.created_at,
             has_ocr_text: doc.ocr_text.is_some(),
+            ocr_confidence: doc.ocr_confidence,
+            ocr_word_count: doc.ocr_word_count,
+            ocr_processing_time_ms: doc.ocr_processing_time_ms,
+            ocr_status: doc.ocr_status,
         }
     }
 }

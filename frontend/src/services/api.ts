@@ -19,6 +19,10 @@ export interface Document {
   tags: string[]
   created_at: string
   has_ocr_text: boolean
+  ocr_confidence?: number
+  ocr_word_count?: number
+  ocr_processing_time_ms?: number
+  ocr_status?: string
 }
 
 export interface SearchRequest {
@@ -53,6 +57,10 @@ export interface EnhancedDocument {
   tags: string[]
   created_at: string
   has_ocr_text: boolean
+  ocr_confidence?: number
+  ocr_word_count?: number
+  ocr_processing_time_ms?: number
+  ocr_status?: string
   search_rank?: number
   snippets: SearchSnippet[]
 }

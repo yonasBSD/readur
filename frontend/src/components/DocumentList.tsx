@@ -42,6 +42,78 @@ function DocumentList({ documents, loading }: DocumentListProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
+  const getOcrStatusBadge = (document: Document) => {
+    if (!document.has_ocr_text) {
+      return null
+    }
+
+    const confidence = document.ocr_confidence
+    const status = document.ocr_status
+
+    if (status === 'failed') {
+      return (
+        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          OCR Failed
+        </span>
+      )
+    }
+
+    if (status === 'processing') {
+      return (
+        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          Processing...
+        </span>
+      )
+    }
+
+    if (confidence !== undefined) {
+      let badgeClass = 'bg-green-100 text-green-800'
+      let label = 'OCR'
+      
+      if (confidence >= 80) {
+        badgeClass = 'bg-green-100 text-green-800'
+        label = `OCR ${confidence.toFixed(0)}%`
+      } else if (confidence >= 60) {
+        badgeClass = 'bg-yellow-100 text-yellow-800'
+        label = `OCR ${confidence.toFixed(0)}%`
+      } else {
+        badgeClass = 'bg-orange-100 text-orange-800'
+        label = `OCR ${confidence.toFixed(0)}%`
+      }
+
+      return (
+        <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
+          {label}
+        </span>
+      )
+    }
+
+    return (
+      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        OCR
+      </span>
+    )
+  }
+
+  const getOcrMetrics = (document: Document) => {
+    if (!document.has_ocr_text || !document.ocr_word_count) {
+      return null
+    }
+
+    const metrics = []
+    
+    if (document.ocr_word_count) {
+      metrics.push(`${document.ocr_word_count} words`)
+    }
+    
+    if (document.ocr_processing_time_ms) {
+      const seconds = (document.ocr_processing_time_ms / 1000).toFixed(1)
+      metrics.push(`${seconds}s`)
+    }
+
+    return metrics.length > 0 ? ` • ${metrics.join(' • ')}` : null
+  }
+
   if (loading) {
     return (
       <div className="text-center py-8">
@@ -74,11 +146,8 @@ function DocumentList({ documents, loading }: DocumentListProps) {
                   </div>
                   <div className="text-sm text-gray-500">
                     {formatFileSize(document.file_size)} • {document.mime_type}
-                    {document.has_ocr_text && (
-                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        OCR
-                      </span>
-                    )}
+                    {getOcrMetrics(document)}
+                    {getOcrStatusBadge(document)}
                   </div>
                   <div className="text-xs text-gray-400">
                     {new Date(document.created_at).toLocaleDateString()}

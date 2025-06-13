@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
+COPY migrations ./migrations
 RUN cargo build --release
 
 # --- Runtime stage ---
@@ -40,6 +41,9 @@ WORKDIR /app
 
 # Copy backend binary
 COPY --from=backend-builder /app/target/release/readur /app/readur
+
+# Copy migrations directory
+COPY --from=backend-builder /app/migrations /app/migrations
 
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/watch /app/frontend

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import FileUpload from './FileUpload'
 import DocumentList from './DocumentList'
 import SearchBar from './SearchBar'
+import OcrAnalytics from './OcrAnalytics'
 import { Document, documentService } from '../services/api'
 
 function Dashboard() {
@@ -54,6 +55,12 @@ function Dashboard() {
       <div className="mb-6">
         <SearchBar onSearch={handleSearch} />
       </div>
+
+      {!searchResults && (
+        <div className="mb-6">
+          <OcrAnalytics documents={documents} />
+        </div>
+      )}
 
       {searchResults && (
         <div className="mb-4">

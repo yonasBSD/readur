@@ -2,8 +2,9 @@ pub mod auth;
 pub mod batch_ingest;
 pub mod config;
 pub mod db;
-pub mod enhanced_ocr; // Temporarily disabled due to compilation errors
+pub mod enhanced_ocr;
 pub mod file_service;
+pub mod migrations;
 pub mod models;
 pub mod ocr;
 pub mod ocr_queue;
