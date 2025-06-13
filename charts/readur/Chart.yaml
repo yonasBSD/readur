@@ -37,10 +37,10 @@ keywords:
   - local-first
 maintainers:
   - name: readur
-    url: https://github.com/readur/Notes
+    url: https://github.com/perfectra1n/readur
   - name: perfectra1n
     email: jon@jonfuller.io
     url: https://perf3ct.tech
 sources:
   - https://github.com/readur/helm-charts
-  - hhttps://github.com/readur/Notes
+  - hhttps://github.com/perfectra1n/readur

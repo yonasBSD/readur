@@ -8,7 +8,7 @@ controllers:
     containers:
       readur:
         image:
-          repository: readur/notes
+          repository: perfectra1n/readur
           tag: v0.92.4
           pullPolicy: IfNotPresent
         env:
