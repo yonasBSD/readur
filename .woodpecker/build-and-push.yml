@@ -8,7 +8,7 @@ steps:
     image: woodpeckerci/plugin-docker-buildx
     settings:
       registry: gitea.perfectra1n.com
-      repo: gitea.perfectra1n.com/perfectra1n/readur-server
+      repo: gitea.perfectra1n.com/perf3ct/readur-server
       dockerfile: server/Dockerfile
       context: .
       tags:
@@ -23,7 +23,7 @@ steps:
     image: woodpeckerci/plugin-docker-buildx
     settings:
       registry: gitea.perfectra1n.com
-      repo: gitea.perfectra1n.com/perfectra1n/readur-client
+      repo: gitea.perfectra1n.com/perf3ct/readur-client
       dockerfile: client/Dockerfile
       context: .
       tags:
