@@ -135,7 +135,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon: Ico
               {value}
             </Typography>
             <Typography variant="h6" sx={{ 
-              opacity: 0.95, 
+              opacity: 0.85, 
               mb: 0.5,
               fontWeight: 600,
               letterSpacing: '0.025em',
@@ -143,7 +143,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon: Ico
               {title}
             </Typography>
             <Typography variant="body2" sx={{ 
-              opacity: 0.85,
+              opacity: 0.75,
               fontWeight: 500,
               fontSize: '0.875rem',
             }}>
@@ -163,7 +163,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon: Ico
                   <TrendingUpIcon sx={{ fontSize: 14 }} />
                 </Box>
                 <Typography variant="caption" sx={{ 
-                  opacity: 0.95,
+                  opacity: 0.8,
                   fontWeight: 600,
                   fontSize: '0.75rem',
                   letterSpacing: '0.025em',

@@ -676,7 +676,15 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                                       size="small"
                                       color="success"
                                       variant="outlined"
-                                      sx={{ height: 16, fontSize: '0.6rem' }}
+                                      sx={{ 
+                                        height: 16, 
+                                        fontSize: '0.6rem',
+                                        '& .MuiChip-label': {
+                                          color: theme.palette.mode === 'light' 
+                                            ? 'success.dark' 
+                                            : 'rgba(102, 187, 106, 0.8)',
+                                        },
+                                      }}
                                     />
                                   )}
                                   {doc.search_rank && (
@@ -686,7 +694,15 @@ const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({ sx, ...props }) => {
                                       size="small"
                                       color="info"
                                       variant="outlined"
-                                      sx={{ height: 16, fontSize: '0.6rem' }}
+                                      sx={{ 
+                                        height: 16, 
+                                        fontSize: '0.6rem',
+                                        '& .MuiChip-label': {
+                                          color: theme.palette.mode === 'light' 
+                                            ? 'info.dark' 
+                                            : 'rgba(100, 181, 246, 0.8)',
+                                        },
+                                      }}
                                     />
                                   )}
                                 </Stack>
