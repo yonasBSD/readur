@@ -82,6 +82,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
+    // Debug: Check what columns exist in documents table
+    let columns_result = sqlx::query(
+        "SELECT column_name FROM information_schema.columns 
+         WHERE table_name = 'documents' AND table_schema = 'public'
+         ORDER BY ordinal_position"
+    )
+    .fetch_all(&db.pool)
+    .await;
+    
+    match columns_result {
+        Ok(rows) => {
+            info!("Columns in documents table:");
+            for row in rows {
+                let column_name: String = row.get("column_name");
+                info!("  - {}", column_name);
+            }
+        }
+        Err(e) => {
+            error!("Failed to check columns: {}", e);
+        }
+    }
+    
     // Seed admin user
     seed::seed_admin_user(&db).await?;
     

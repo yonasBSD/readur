@@ -8,6 +8,7 @@ services:
       - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
       - UPLOAD_PATH=/app/uploads
       - WATCH_FOLDER=/app/watch
+      - RUST_BACKTRACE=1
     volumes:
       - uploads:/app/uploads
       - watch:/app/watch

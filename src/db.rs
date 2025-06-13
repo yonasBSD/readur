@@ -322,9 +322,9 @@ impl Database {
     pub async fn create_document(&self, document: Document) -> Result<Document> {
         let row = sqlx::query(
             r#"
-            INSERT INTO documents (id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, tags, created_at, updated_at, user_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            RETURNING id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, tags, created_at, updated_at, user_id
+            INSERT INTO documents (id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+            RETURNING id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id
             "#
         )
         .bind(document.id)
@@ -335,6 +335,12 @@ impl Database {
         .bind(&document.mime_type)
         .bind(&document.content)
         .bind(&document.ocr_text)
+        .bind(document.ocr_confidence)
+        .bind(document.ocr_word_count)
+        .bind(document.ocr_processing_time_ms)
+        .bind(&document.ocr_status)
+        .bind(&document.ocr_error)
+        .bind(document.ocr_completed_at)
         .bind(&document.tags)
         .bind(document.created_at)
         .bind(document.updated_at)
@@ -355,6 +361,8 @@ impl Database {
             ocr_word_count: row.get("ocr_word_count"),
             ocr_processing_time_ms: row.get("ocr_processing_time_ms"),
             ocr_status: row.get("ocr_status"),
+            ocr_error: row.get("ocr_error"),
+            ocr_completed_at: row.get("ocr_completed_at"),
             tags: row.get("tags"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
@@ -393,6 +401,8 @@ impl Database {
                 ocr_word_count: row.get("ocr_word_count"),
                 ocr_processing_time_ms: row.get("ocr_processing_time_ms"),
                 ocr_status: row.get("ocr_status"),
+                ocr_error: row.get("ocr_error"),
+                ocr_completed_at: row.get("ocr_completed_at"),
                 tags: row.get("tags"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
@@ -431,6 +441,8 @@ impl Database {
                 ocr_word_count: row.get("ocr_word_count"),
                 ocr_processing_time_ms: row.get("ocr_processing_time_ms"),
                 ocr_status: row.get("ocr_status"),
+                ocr_error: row.get("ocr_error"),
+                ocr_completed_at: row.get("ocr_completed_at"),
                 tags: row.get("tags"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
@@ -499,6 +511,8 @@ impl Database {
                 ocr_word_count: row.get("ocr_word_count"),
                 ocr_processing_time_ms: row.get("ocr_processing_time_ms"),
                 ocr_status: row.get("ocr_status"),
+                ocr_error: row.get("ocr_error"),
+                ocr_completed_at: row.get("ocr_completed_at"),
                 tags: row.get("tags"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
@@ -580,7 +594,7 @@ impl Database {
                            CASE WHEN filename ILIKE '%' || "#
             ));
             builder.push_bind(&search.query);
-            builder.push(&format!(r#"' || '%' THEN 0.8 ELSE 0 END,
+            builder.push(&format!(r#" || '%' THEN 0.8 ELSE 0 END,
                            ts_rank(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')), {}('english', "#, query_function));
             builder.push_bind(&search.query);
             builder.push(&format!(r#"))

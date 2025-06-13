@@ -22,6 +22,12 @@ CREATE TABLE IF NOT EXISTS documents (
     mime_type VARCHAR(100) NOT NULL,
     content TEXT,
     ocr_text TEXT,
+    ocr_confidence REAL,
+    ocr_word_count INT,
+    ocr_processing_time_ms INT,
+    ocr_status VARCHAR(20) DEFAULT 'pending',
+    ocr_error TEXT,
+    ocr_completed_at TIMESTAMPTZ,
     tags TEXT[] DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -36,6 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_documents_tags ON documents USING GIN(tags);
 CREATE INDEX IF NOT EXISTS idx_documents_content_search ON documents USING GIN(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')));
 CREATE INDEX IF NOT EXISTS idx_documents_filename_trgm ON documents USING GIN(filename gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_documents_content_trgm ON documents USING GIN((COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_documents_ocr_confidence ON documents(ocr_confidence) WHERE ocr_confidence IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_documents_ocr_word_count ON documents(ocr_word_count) WHERE ocr_word_count IS NOT NULL;
 
 -- Create settings table
 CREATE TABLE IF NOT EXISTS settings (
@@ -57,6 +65,15 @@ CREATE TABLE IF NOT EXISTS settings (
     memory_limit_mb INT DEFAULT 512,
     cpu_priority VARCHAR(10) DEFAULT 'normal',
     enable_background_ocr BOOLEAN DEFAULT TRUE,
+    ocr_page_segmentation_mode INT DEFAULT 3,
+    ocr_engine_mode INT DEFAULT 3,
+    ocr_min_confidence REAL DEFAULT 30.0,
+    ocr_dpi INT DEFAULT 300,
+    ocr_enhance_contrast BOOLEAN DEFAULT true,
+    ocr_remove_noise BOOLEAN DEFAULT true,
+    ocr_detect_orientation BOOLEAN DEFAULT true,
+    ocr_whitelist_chars TEXT,
+    ocr_blacklist_chars TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

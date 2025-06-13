@@ -54,6 +54,8 @@ pub struct Document {
     pub ocr_word_count: Option<i32>,
     pub ocr_processing_time_ms: Option<i32>,
     pub ocr_status: Option<String>,
+    pub ocr_error: Option<String>,
+    pub ocr_completed_at: Option<DateTime<Utc>>,
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
