@@ -114,11 +114,12 @@ impl MigrationRunner {
         // Start a transaction
         let mut tx = self.pool.begin().await?;
 
-        // Split SQL into individual statements and execute each one
-        let statements = self.split_sql_statements(&migration.sql);
+        // Simple approach: split on semicolons and execute each statement
+        let statements = self.split_simple(&migration.sql);
         
         for (i, statement) in statements.iter().enumerate() {
-            if statement.trim().is_empty() {
+            let statement = statement.trim();
+            if statement.is_empty() {
                 continue;
             }
             
@@ -126,8 +127,8 @@ impl MigrationRunner {
                 .execute(&mut *tx)
                 .await
                 .map_err(|e| {
-                    error!("Failed to apply migration {} statement {}: {}\nStatement: {}", 
-                           migration.version, i + 1, e, statement);
+                    error!("Failed to execute statement {} in migration {}: {}\nStatement: {}", 
+                           i + 1, migration.version, e, statement);
                     e
                 })?;
         }
@@ -148,56 +149,56 @@ impl MigrationRunner {
         Ok(())
     }
 
-    /// Split SQL content into individual statements
-    fn split_sql_statements(&self, sql: &str) -> Vec<String> {
+    /// Simple SQL splitting - handle dollar-quoted strings properly
+    fn split_simple(&self, sql: &str) -> Vec<String> {
         let mut statements = Vec::new();
-        let mut current_statement = String::new();
-        let mut in_function = false;
-        let mut function_depth = 0;
+        let mut current = String::new();
+        let mut in_dollar_quote = false;
+        let mut dollar_tag = String::new();
         
         for line in sql.lines() {
             let trimmed = line.trim();
             
-            // Skip comments and empty lines
-            if trimmed.is_empty() || trimmed.starts_with("--") {
+            // Skip empty lines and comments when not in a dollar quote
+            if !in_dollar_quote && (trimmed.is_empty() || trimmed.starts_with("--")) {
                 continue;
             }
             
-            // Detect function definitions (PostgreSQL functions can contain semicolons)
-            if trimmed.contains("CREATE OR REPLACE FUNCTION") || trimmed.contains("CREATE FUNCTION") {
-                in_function = true;
-                function_depth = 0;
-            }
-            
-            current_statement.push_str(line);
-            current_statement.push('\n');
-            
-            // Track function block depth
-            if in_function {
-                if trimmed.contains("BEGIN") {
-                    function_depth += 1;
-                }
-                if trimmed.contains("END;") {
-                    function_depth -= 1;
-                    if function_depth <= 0 {
-                        in_function = false;
-                        statements.push(current_statement.trim().to_string());
-                        current_statement.clear();
-                        continue;
+            // Check for dollar quote start/end
+            if let Some(tag_start) = line.find("$$") {
+                if !in_dollar_quote {
+                    // Starting a dollar quote
+                    in_dollar_quote = true;
+                    // Extract the tag (if any) between the $$ 
+                    if let Some(tag_end) = line[tag_start + 2..].find("$$") {
+                        // This line both starts and ends the quote - shouldn't happen with functions
+                        in_dollar_quote = false;
+                    }
+                } else {
+                    // Might be ending the dollar quote
+                    if line.contains("$$") {
+                        in_dollar_quote = false;
                     }
                 }
             }
             
-            // For non-function statements, split on semicolon
-            if !in_function && trimmed.ends_with(';') {
-                statements.push(current_statement.trim().to_string());
-                current_statement.clear();
+            current.push_str(line);
+            current.push('\n');
+            
+            // If not in dollar quote and line ends with semicolon, this is a complete statement
+            if !in_dollar_quote && trimmed.ends_with(';') {
+                let statement = current.trim();
+                if !statement.is_empty() {
+                    statements.push(statement.to_string());
+                }
+                current.clear();
             }
         }
         
-        // Add any remaining statement
-        if !current_statement.trim().is_empty() {
-            statements.push(current_statement.trim().to_string());
+        // Add any remaining content as final statement
+        let final_statement = current.trim();
+        if !final_statement.is_empty() {
+            statements.push(final_statement.to_string());
         }
         
         statements
