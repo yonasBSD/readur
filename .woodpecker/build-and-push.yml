@@ -4,27 +4,12 @@ steps:
     settings:
       skip_verify: true
 
-  build-server:
+  build:
     image: woodpeckerci/plugin-docker-buildx
     settings:
       registry: gitea.perfectra1n.com
-      repo: gitea.perfectra1n.com/perf3ct/readur-server
-      dockerfile: server/Dockerfile
-      context: .
-      tags:
-        - latest
-        - ${CI_COMMIT_TAG}
-      username:
-        from_secret: GITEA_USERNAME
-      password:
-        from_secret: GITEA_PASSWORD
-
-  build-client:
-    image: woodpeckerci/plugin-docker-buildx
-    settings:
-      registry: gitea.perfectra1n.com
-      repo: gitea.perfectra1n.com/perf3ct/readur-client
-      dockerfile: client/Dockerfile
+      repo: gitea.perfectra1n.com/perf3ct/readur
+      dockerfile: Dockerfile
       context: .
       tags:
         - latest
