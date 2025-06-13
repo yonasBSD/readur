@@ -4,12 +4,43 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use utoipa::{ToSchema, IntoParams};
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+pub enum UserRole {
+    #[serde(rename = "admin")]
+    Admin,
+    #[serde(rename = "user")]
+    User,
+}
+
+impl std::fmt::Display for UserRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserRole::Admin => write!(f, "admin"),
+            UserRole::User => write!(f, "user"),
+        }
+    }
+}
+
+impl TryFrom<String> for UserRole {
+    type Error = String;
+    
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "admin" => Ok(UserRole::Admin),
+            "user" => Ok(UserRole::User),
+            _ => Err(format!("Invalid user role: {}", value)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
     pub email: String,
     pub password_hash: String,
+    #[sqlx(try_from = "String")]
+    pub role: UserRole,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -19,6 +50,12 @@ pub struct CreateUser {
     pub username: String,
     pub email: String,
     pub password: String,
+    #[serde(default = "default_user_role")]
+    pub role: Option<UserRole>,
+}
+
+fn default_user_role() -> Option<UserRole> {
+    Some(UserRole::User)
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

@@ -34,6 +34,7 @@ impl Database {
                 username VARCHAR(255) UNIQUE NOT NULL,
                 email VARCHAR(255) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(10) DEFAULT 'user',
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             )
@@ -41,6 +42,7 @@ impl Database {
         )
         .execute(&self.pool)
         .await?;
+        
         
         // Create documents table
         sqlx::query(
@@ -262,14 +264,15 @@ impl Database {
 
         let row = sqlx::query(
             r#"
-            INSERT INTO users (username, email, password_hash, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, username, email, password_hash, created_at, updated_at
+            INSERT INTO users (username, email, password_hash, role, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, username, email, password_hash, role, created_at, updated_at
             "#
         )
         .bind(&user.username)
         .bind(&user.email)
         .bind(&password_hash)
+        .bind(user.role.as_ref().unwrap_or(&crate::models::UserRole::User).to_string())
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -280,6 +283,7 @@ impl Database {
             username: row.get("username"),
             email: row.get("email"),
             password_hash: row.get("password_hash"),
+            role: row.get::<String, _>("role").try_into().unwrap_or(crate::models::UserRole::User),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })
@@ -287,7 +291,7 @@ impl Database {
 
     pub async fn get_user_by_username(&self, username: &str) -> Result<Option<User>> {
         let row = sqlx::query(
-            "SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username = $1"
+            "SELECT id, username, email, password_hash, role, created_at, updated_at FROM users WHERE username = $1"
         )
         .bind(username)
         .fetch_optional(&self.pool)
@@ -299,6 +303,7 @@ impl Database {
                 username: row.get("username"),
                 email: row.get("email"),
                 password_hash: row.get("password_hash"),
+                role: row.get::<String, _>("role").try_into().unwrap_or(crate::models::UserRole::User),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             })),
@@ -308,7 +313,7 @@ impl Database {
 
     pub async fn get_user_by_id(&self, id: Uuid) -> Result<Option<User>> {
         let row = sqlx::query(
-            "SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE id = $1"
+            "SELECT id, username, email, password_hash, role, created_at, updated_at FROM users WHERE id = $1"
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -320,6 +325,7 @@ impl Database {
                 username: row.get("username"),
                 email: row.get("email"),
                 password_hash: row.get("password_hash"),
+                role: row.get::<String, _>("role").try_into().unwrap_or(crate::models::UserRole::User),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             })),
@@ -376,6 +382,68 @@ impl Database {
             updated_at: row.get("updated_at"),
             user_id: row.get("user_id"),
         })
+    }
+
+    pub async fn get_documents_by_user_with_role(&self, user_id: Uuid, user_role: crate::models::UserRole, limit: i64, offset: i64) -> Result<Vec<Document>> {
+        let query = if user_role == crate::models::UserRole::Admin {
+            // Admins can see all documents
+            r#"
+            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id
+            FROM documents 
+            ORDER BY created_at DESC 
+            LIMIT $1 OFFSET $2
+            "#
+        } else {
+            // Regular users can only see their own documents
+            r#"
+            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id
+            FROM documents 
+            WHERE user_id = $3 
+            ORDER BY created_at DESC 
+            LIMIT $1 OFFSET $2
+            "#
+        };
+
+        let rows = if user_role == crate::models::UserRole::Admin {
+            sqlx::query(query)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(&self.pool)
+                .await?
+        } else {
+            sqlx::query(query)
+                .bind(limit)
+                .bind(offset)
+                .bind(user_id)
+                .fetch_all(&self.pool)
+                .await?
+        };
+
+        let documents = rows
+            .into_iter()
+            .map(|row| Document {
+                id: row.get("id"),
+                filename: row.get("filename"),
+                original_filename: row.get("original_filename"),
+                file_path: row.get("file_path"),
+                file_size: row.get("file_size"),
+                mime_type: row.get("mime_type"),
+                content: row.get("content"),
+                ocr_text: row.get("ocr_text"),
+                ocr_confidence: row.get("ocr_confidence"),
+                ocr_word_count: row.get("ocr_word_count"),
+                ocr_processing_time_ms: row.get("ocr_processing_time_ms"),
+                ocr_status: row.get("ocr_status"),
+                ocr_error: row.get("ocr_error"),
+                ocr_completed_at: row.get("ocr_completed_at"),
+                tags: row.get("tags"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+                user_id: row.get("user_id"),
+            })
+            .collect();
+
+        Ok(documents)
     }
 
     pub async fn get_documents_by_user(&self, user_id: Uuid, limit: i64, offset: i64) -> Result<Vec<Document>> {
@@ -543,6 +611,203 @@ impl Database {
         let total: i64 = total_row.get("total");
 
         Ok((documents, total))
+    }
+
+    pub async fn enhanced_search_documents_with_role(&self, user_id: Uuid, user_role: crate::models::UserRole, search: SearchRequest) -> Result<(Vec<EnhancedDocumentResponse>, i64, u64)> {
+        let start_time = std::time::Instant::now();
+        
+        // Build search query based on search mode with enhanced substring matching
+        let search_mode = search.search_mode.as_ref().unwrap_or(&SearchMode::Simple);
+        
+        // For fuzzy mode, we'll use similarity matching which is better for substrings
+        let use_similarity = matches!(search_mode, SearchMode::Fuzzy);
+        
+        let user_filter = if user_role == crate::models::UserRole::Admin {
+            // Admins can search all documents
+            ""
+        } else {
+            // Regular users can only search their own documents
+            " AND user_id = "
+        };
+        
+        let mut query_builder = if use_similarity {
+            // Use trigram similarity for substring matching
+            let mut builder = sqlx::QueryBuilder::new(
+                r#"
+                SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id,
+                       GREATEST(
+                           similarity(filename, "#
+            );
+            builder.push_bind(&search.query);
+            builder.push(r#"),
+                           similarity(COALESCE(content, '') || ' ' || COALESCE(ocr_text, ''), "#);
+            builder.push_bind(&search.query);
+            builder.push(r#"),
+                           ts_rank(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')), plainto_tsquery('english', "#);
+            builder.push_bind(&search.query);
+            builder.push(r#"))
+                       ) as rank
+                FROM documents 
+                WHERE (
+                    filename % "#);
+            builder.push_bind(&search.query);
+            builder.push(r#" OR
+                    (COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) % "#);
+            builder.push_bind(&search.query);
+            builder.push(r#" OR
+                    to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ plainto_tsquery('english', "#);
+            builder.push_bind(&search.query);
+            builder.push(r#")
+                )"#);
+                
+            if !user_filter.is_empty() {
+                builder.push(user_filter);
+                builder.push_bind(user_id);
+            }
+            
+            builder
+        } else {
+            // Use traditional full-text search with enhanced ranking
+            let query_function = match search_mode {
+                SearchMode::Simple => "plainto_tsquery",
+                SearchMode::Phrase => "phraseto_tsquery", 
+                SearchMode::Boolean => "to_tsquery",
+                SearchMode::Fuzzy => "plainto_tsquery", // fallback
+            };
+
+            let mut builder = sqlx::QueryBuilder::new(&format!(
+                r#"
+                SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id,
+                       GREATEST(
+                           CASE WHEN filename ILIKE '%' || "#
+            ));
+            builder.push_bind(&search.query);
+            builder.push(&format!(r#" || '%' THEN 0.8 ELSE 0 END,
+                           ts_rank(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')), {}('english', "#, query_function));
+            builder.push_bind(&search.query);
+            builder.push(&format!(r#"))
+                       ) as rank
+                FROM documents 
+                WHERE (
+                    filename ILIKE '%' || "#));
+            builder.push_bind(&search.query);
+            builder.push(&format!(r#" || '%' OR
+                    to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ {}('english', "#, query_function));
+            builder.push_bind(&search.query);
+            builder.push(r#")
+                )"#);
+                
+            if !user_filter.is_empty() {
+                builder.push(user_filter);
+                builder.push_bind(user_id);
+            }
+            
+            builder
+        };
+
+        if let Some(tags) = &search.tags {
+            if !tags.is_empty() {
+                query_builder.push(" AND tags && ");
+                query_builder.push_bind(tags);
+            }
+        }
+
+        if let Some(mime_types) = &search.mime_types {
+            if !mime_types.is_empty() {
+                query_builder.push(" AND mime_type = ANY(");
+                query_builder.push_bind(mime_types);
+                query_builder.push(")");
+            }
+        }
+
+        query_builder.push(" ORDER BY rank DESC, created_at DESC");
+        
+        if let Some(limit) = search.limit {
+            query_builder.push(" LIMIT ");
+            query_builder.push_bind(limit);
+        }
+        
+        if let Some(offset) = search.offset {
+            query_builder.push(" OFFSET ");
+            query_builder.push_bind(offset);
+        }
+
+        let rows = query_builder.build().fetch_all(&self.pool).await?;
+
+        let include_snippets = search.include_snippets.unwrap_or(true);
+        let snippet_length = search.snippet_length.unwrap_or(200);
+
+        let mut documents = Vec::new();
+        for row in rows {
+            let doc_id: Uuid = row.get("id");
+            let content: Option<String> = row.get("content");
+            let ocr_text: Option<String> = row.get("ocr_text");
+            let rank: f32 = row.get("rank");
+
+            let snippets = if include_snippets {
+                self.generate_snippets(&search.query, content.as_deref(), ocr_text.as_deref(), snippet_length)
+            } else {
+                Vec::new()
+            };
+
+            documents.push(EnhancedDocumentResponse {
+                id: doc_id,
+                filename: row.get("filename"),
+                original_filename: row.get("original_filename"),
+                file_size: row.get("file_size"),
+                mime_type: row.get("mime_type"),
+                tags: row.get("tags"),
+                created_at: row.get("created_at"),
+                has_ocr_text: ocr_text.is_some(),
+                ocr_confidence: row.get("ocr_confidence"),
+                ocr_word_count: row.get("ocr_word_count"),
+                ocr_processing_time_ms: row.get("ocr_processing_time_ms"),
+                ocr_status: row.get("ocr_status"),
+                search_rank: Some(rank),
+                snippets,
+            });
+        }
+
+        // Get the query function for total count
+        let query_function = if use_similarity {
+            "plainto_tsquery"
+        } else {
+            match search_mode {
+                SearchMode::Simple => "plainto_tsquery",
+                SearchMode::Phrase => "phraseto_tsquery", 
+                SearchMode::Boolean => "to_tsquery",
+                SearchMode::Fuzzy => "plainto_tsquery",
+            }
+        };
+
+        let total_row = if user_role == crate::models::UserRole::Admin {
+            sqlx::query(&format!(
+                r#"
+                SELECT COUNT(*) as total FROM documents 
+                WHERE to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ {}('english', $1)
+                "#, query_function
+            ))
+            .bind(&search.query)
+            .fetch_one(&self.pool)
+            .await?
+        } else {
+            sqlx::query(&format!(
+                r#"
+                SELECT COUNT(*) as total FROM documents 
+                WHERE user_id = $1 
+                AND to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ {}('english', $2)
+                "#, query_function
+            ))
+            .bind(user_id)
+            .bind(&search.query)
+            .fetch_one(&self.pool)
+            .await?
+        };
+
+        let total: i64 = total_row.get("total");
+        let query_time = start_time.elapsed().as_millis() as u64;
+
+        Ok((documents, total, query_time))
     }
 
     pub async fn enhanced_search_documents(&self, user_id: Uuid, search: SearchRequest) -> Result<(Vec<EnhancedDocumentResponse>, i64, u64)> {
@@ -874,7 +1139,7 @@ impl Database {
 
     pub async fn get_all_users(&self) -> Result<Vec<User>> {
         let rows = sqlx::query(
-            "SELECT id, username, email, password_hash, created_at, updated_at FROM users ORDER BY created_at DESC"
+            "SELECT id, username, email, password_hash, role, created_at, updated_at FROM users ORDER BY created_at DESC"
         )
         .fetch_all(&self.pool)
         .await?;
@@ -886,6 +1151,7 @@ impl Database {
                 username: row.get("username"),
                 email: row.get("email"),
                 password_hash: row.get("password_hash"),
+                role: row.get::<String, _>("role").try_into().unwrap_or(crate::models::UserRole::User),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             })
@@ -909,7 +1175,7 @@ impl Database {
             r#"
             UPDATE users SET username = $1, email = $2, password_hash = $3, updated_at = NOW()
             WHERE id = $4
-            RETURNING id, username, email, password_hash, created_at, updated_at
+            RETURNING id, username, email, password_hash, role, created_at, updated_at
             "#
         )
         .bind(&username)
@@ -924,6 +1190,7 @@ impl Database {
             username: row.get("username"),
             email: row.get("email"),
             password_hash: row.get("password_hash"),
+            role: row.get::<String, _>("role").try_into().unwrap_or(crate::models::UserRole::User),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })
@@ -1021,9 +1288,11 @@ impl Database {
                 retention_days, enable_auto_cleanup, enable_compression, memory_limit_mb,
                 cpu_priority, enable_background_ocr, ocr_page_segmentation_mode, ocr_engine_mode,
                 ocr_min_confidence, ocr_dpi, ocr_enhance_contrast, ocr_remove_noise,
-                ocr_detect_orientation, ocr_whitelist_chars, ocr_blacklist_chars
+                ocr_detect_orientation, ocr_whitelist_chars, ocr_blacklist_chars,
+                webdav_enabled, webdav_server_url, webdav_username, webdav_password,
+                webdav_watch_folders, webdav_file_extensions, webdav_auto_sync, webdav_sync_interval_minutes
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
             ON CONFLICT (user_id) DO UPDATE SET
                 ocr_language = $2,
                 concurrent_ocr_jobs = $3,
@@ -1050,6 +1319,14 @@ impl Database {
                 ocr_detect_orientation = $24,
                 ocr_whitelist_chars = $25,
                 ocr_blacklist_chars = $26,
+                webdav_enabled = $27,
+                webdav_server_url = $28,
+                webdav_username = $29,
+                webdav_password = $30,
+                webdav_watch_folders = $31,
+                webdav_file_extensions = $32,
+                webdav_auto_sync = $33,
+                webdav_sync_interval_minutes = $34,
                 updated_at = NOW()
             RETURNING id, user_id, ocr_language, concurrent_ocr_jobs, ocr_timeout_seconds,
                       max_file_size_mb, allowed_file_types, auto_rotate_images, enable_image_preprocessing,
@@ -1058,6 +1335,8 @@ impl Database {
                       cpu_priority, enable_background_ocr, ocr_page_segmentation_mode, ocr_engine_mode,
                       ocr_min_confidence, ocr_dpi, ocr_enhance_contrast, ocr_remove_noise,
                       ocr_detect_orientation, ocr_whitelist_chars, ocr_blacklist_chars,
+                      webdav_enabled, webdav_server_url, webdav_username, webdav_password,
+                      webdav_watch_folders, webdav_file_extensions, webdav_auto_sync, webdav_sync_interval_minutes,
                       created_at, updated_at
             "#
         )
@@ -1087,6 +1366,14 @@ impl Database {
         .bind(settings.ocr_detect_orientation.unwrap_or(current.ocr_detect_orientation))
         .bind(settings.ocr_whitelist_chars.as_ref().unwrap_or(&current.ocr_whitelist_chars))
         .bind(settings.ocr_blacklist_chars.as_ref().unwrap_or(&current.ocr_blacklist_chars))
+        .bind(settings.webdav_enabled.unwrap_or(current.webdav_enabled))
+        .bind(settings.webdav_server_url.as_ref().unwrap_or(&current.webdav_server_url))
+        .bind(settings.webdav_username.as_ref().unwrap_or(&current.webdav_username))
+        .bind(settings.webdav_password.as_ref().unwrap_or(&current.webdav_password))
+        .bind(settings.webdav_watch_folders.as_ref().unwrap_or(&current.webdav_watch_folders))
+        .bind(settings.webdav_file_extensions.as_ref().unwrap_or(&current.webdav_file_extensions))
+        .bind(settings.webdav_auto_sync.unwrap_or(current.webdav_auto_sync))
+        .bind(settings.webdav_sync_interval_minutes.unwrap_or(current.webdav_sync_interval_minutes))
         .fetch_one(&self.pool)
         .await?;
 

@@ -914,6 +914,7 @@ mod tests {
             username: "test_enhanced_search".to_string(),
             email: "enhanced@test.com".to_string(),
             password: "password123".to_string(),
+            role: Some(crate::models::UserRole::User),
         };
         let user = db.create_user(user_data).await.unwrap();
         

@@ -162,7 +162,7 @@ async fn list_documents(
     
     let documents = state
         .db
-        .get_documents_by_user(auth_user.user.id, limit, offset)
+        .get_documents_by_user_with_role(auth_user.user.id, auth_user.user.role, limit, offset)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     
@@ -194,7 +194,7 @@ async fn download_document(
 ) -> Result<Vec<u8>, StatusCode> {
     let documents = state
         .db
-        .get_documents_by_user(auth_user.user.id, 1000, 0)
+        .get_documents_by_user_with_role(auth_user.user.id, auth_user.user.role, 1000, 0)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     
@@ -236,7 +236,7 @@ async fn get_document_ocr(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let documents = state
         .db
-        .get_documents_by_user(auth_user.user.id, 1000, 0)
+        .get_documents_by_user_with_role(auth_user.user.id, auth_user.user.role, 1000, 0)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     

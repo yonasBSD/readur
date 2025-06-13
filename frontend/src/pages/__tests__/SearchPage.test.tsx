@@ -1,22 +1,22 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, vi } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import SearchPage from '../SearchPage';
 import { documentService } from '../../services/api';
 
 // Mock the API service
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   documentService: {
-    enhancedSearch: jest.fn(),
-    search: jest.fn(),
-    download: jest.fn(),
+    enhancedSearch: vi.fn(),
+    search: vi.fn(),
+    download: vi.fn(),
   }
 }));
 
 // Mock SearchGuidance component
-jest.mock('../../components/SearchGuidance', () => {
-  return function MockSearchGuidance({ onExampleClick, compact }) {
+vi.mock('../../components/SearchGuidance', () => ({
+  default: function MockSearchGuidance({ onExampleClick, compact }: any) {
     return (
       <div data-testid="search-guidance">
         <button onClick={() => onExampleClick?.('test query')}>
@@ -25,13 +25,13 @@ jest.mock('../../components/SearchGuidance', () => {
         {compact && <span>Compact Mode</span>}
       </div>
     );
-  };
+  }
 });
 
 // Mock useNavigate
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({
+  ...vi.importActual('react-router-dom'),
   useNavigate: () => mockNavigate,
 }));
 
@@ -78,7 +78,7 @@ const renderWithRouter = (component) => {
 
 describe('SearchPage', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     documentService.enhancedSearch.mockResolvedValue(mockSearchResponse);
     documentService.search.mockResolvedValue(mockSearchResponse);
   });
@@ -390,8 +390,8 @@ describe('SearchPage', () => {
     documentService.download.mockResolvedValue({ data: mockBlob });
     
     // Mock URL.createObjectURL
-    global.URL.createObjectURL = jest.fn(() => 'mock-url');
-    global.URL.revokeObjectURL = jest.fn();
+    global.URL.createObjectURL = vi.fn(() => 'mock-url');
+    global.URL.revokeObjectURL = vi.fn();
     
     renderWithRouter(<SearchPage />);
     

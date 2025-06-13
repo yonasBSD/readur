@@ -312,10 +312,10 @@ async fn process_file(
     
     let saved_file_path = file_service.save_file(&filename, &file_data).await?;
     
-    // Fetch system user ID from database
-    let system_user = db.get_user_by_username("system").await?
-        .ok_or_else(|| anyhow::anyhow!("System user not found. Please ensure the system user is created."))?;
-    let system_user_id = system_user.id;
+    // Fetch admin user ID from database for watch folder documents
+    let admin_user = db.get_user_by_username("admin").await?
+        .ok_or_else(|| anyhow::anyhow!("Admin user not found. Please ensure the admin user is created."))?;
+    let admin_user_id = admin_user.id;
     
     let document = file_service.create_document(
         &filename,
@@ -323,7 +323,7 @@ async fn process_file(
         &saved_file_path,
         file_size,
         &mime_type,
-        system_user_id,
+        admin_user_id,
     );
     
     let created_doc = db.create_document(document).await?;

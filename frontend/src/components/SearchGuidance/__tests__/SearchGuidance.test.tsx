@@ -1,13 +1,13 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, vi } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SearchGuidance from '../SearchGuidance';
 
 describe('SearchGuidance', () => {
-  const mockOnExampleClick = jest.fn();
+  const mockOnExampleClick = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   test('renders search guidance with examples in expanded mode', () => {
@@ -263,7 +263,7 @@ describe('SearchGuidance Accessibility', () => {
 
   test('examples are keyboard accessible', async () => {
     const user = userEvent.setup();
-    const mockOnExampleClick = jest.fn();
+    const mockOnExampleClick = vi.fn();
     render(<SearchGuidance onExampleClick={mockOnExampleClick} />);
     
     // Expand accordion

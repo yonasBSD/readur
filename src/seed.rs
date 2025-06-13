@@ -30,6 +30,7 @@ pub async fn seed_admin_user(db: &Database) -> Result<()> {
         username: admin_username.to_string(),
         email: admin_email.to_string(),
         password: admin_password.to_string(),
+        role: Some(crate::models::UserRole::Admin),
     };
 
     match db.create_user(create_user).await {
@@ -72,6 +73,7 @@ pub async fn seed_system_user(db: &Database) -> Result<()> {
         username: system_username.to_string(),
         email: system_email.to_string(),
         password: system_password.to_string(),
+        role: Some(crate::models::UserRole::User),
     };
 
     match db.create_user(create_user).await {

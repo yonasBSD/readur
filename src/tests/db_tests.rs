@@ -24,6 +24,7 @@ mod tests {
             username: format!("testuser_{}", suffix),
             email: format!("test_{}@example.com", suffix),
             password: "password123".to_string(),
+            role: Some(crate::models::UserRole::User),
         }
     }
 

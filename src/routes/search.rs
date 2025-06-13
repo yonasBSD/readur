@@ -96,7 +96,7 @@ async fn enhanced_search_documents(
     
     let (documents, total, query_time) = state
         .db
-        .enhanced_search_documents(auth_user.user.id, search_request)
+        .enhanced_search_documents_with_role(auth_user.user.id, auth_user.user.role, search_request)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

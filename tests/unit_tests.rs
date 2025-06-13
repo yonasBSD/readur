@@ -100,6 +100,7 @@ fn test_user_response_conversion() {
         username: "testuser".to_string(),
         email: "test@example.com".to_string(),
         password_hash: "hashed".to_string(),
+        role: readur::models::UserRole::User,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };

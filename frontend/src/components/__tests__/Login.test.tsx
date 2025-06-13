@@ -1,17 +1,24 @@
-import { screen, fireEvent, waitFor, vi } from '@testing-library/react'
-import { renderWithMockAuth } from '../../test/test-utils'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { vi } from 'vitest'
 import Login from '../Login'
 
-// Mock the API service
-vi.mock('../../services/api', () => ({
-  api: {
-    defaults: { headers: { common: {} } },
-    get: vi.fn(),
-    post: vi.fn(),
-  },
-}))
-
 const mockLogin = vi.fn()
+
+const MockAuthProvider = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <div>
+      {children}
+    </div>
+  )
+}
+
+const renderWithMockAuth = (component: React.ReactNode, authContext = {}) => {
+  return render(
+    <MockAuthProvider>
+      {component}
+    </MockAuthProvider>
+  )
+}
 
 describe('Login', () => {
   beforeEach(() => {

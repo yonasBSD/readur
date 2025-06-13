@@ -11,6 +11,7 @@ mod tests {
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
             password_hash: "hashed_password".to_string(),
+            role: crate::models::UserRole::User,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

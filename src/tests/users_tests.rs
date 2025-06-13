@@ -95,6 +95,7 @@ mod tests {
             username: "newuser".to_string(),
             email: "new@example.com".to_string(),
             password: "newpassword".to_string(),
+            role: Some(crate::models::UserRole::User),
         };
 
         let response = app

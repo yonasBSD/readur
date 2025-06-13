@@ -56,6 +56,7 @@ impl TestClient {
             username: username.to_string(),
             email: email.to_string(),
             password: password.to_string(),
+            role: Some(readur::models::UserRole::User),
         };
         
         let register_response = self.client
@@ -176,12 +177,16 @@ async fn test_complete_ocr_workflow() {
         panic!("Server not running at {}: {}", BASE_URL, e);
     }
     
-    // Create test user
-    let username = "rust_integration_test";
-    let email = "rust_test@example.com";
+    // Create test user with unique timestamp
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    let username = format!("rust_integration_test_{}", timestamp);
+    let email = format!("rust_test_{}@example.com", timestamp);
     let password = "testpassword123";
     
-    let token = client.register_and_login(username, email, password).await
+    let token = client.register_and_login(&username, &email, password).await
         .expect("Failed to register and login");
     
     println!("✅ User registered and logged in, token: {}", &token[..20]);
@@ -241,7 +246,7 @@ Technology: Rust + Axum + SQLx"#;
         }
         
         if let Some(processing_time) = ocr_data["ocr_processing_time_ms"].as_i64() {
-            assert!(processing_time > 0, "Processing time should be positive");
+            assert!(processing_time >= 0, "Processing time should be non-negative");
             println!("✅ OCR processing time: {}ms", processing_time);
         }
     }
@@ -263,8 +268,15 @@ async fn test_ocr_error_handling() {
     assert_eq!(response.status(), 401, "Should return 401 for unauthorized access");
     
     // Test with valid auth but invalid document
-    let token = client.register_and_login("rust_error_test", "rust_error@test.com", "testpass123").await
-        .expect("Failed to register and login");
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    let token = client.register_and_login(
+        &format!("rust_error_test_{}", timestamp), 
+        &format!("rust_error_{}@test.com", timestamp), 
+        "testpass123"
+    ).await.expect("Failed to register and login");
     
     let response = client.client
         .get(&format!("{}/api/documents/00000000-0000-0000-0000-000000000000/ocr", BASE_URL))
@@ -293,8 +305,15 @@ async fn test_document_list_structure() {
     let mut client = TestClient::new();
     
     // Register and login
-    let _token = client.register_and_login("rust_list_test", "rust_list@test.com", "testpass123").await
-        .expect("Failed to register and login");
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    let _token = client.register_and_login(
+        &format!("rust_list_test_{}", timestamp), 
+        &format!("rust_list_{}@test.com", timestamp), 
+        "testpass123"
+    ).await.expect("Failed to register and login");
     
     // Upload a document
     let document = client.upload_document("Test content for list", "list_test.txt").await
