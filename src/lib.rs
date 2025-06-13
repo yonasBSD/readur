@@ -4,7 +4,6 @@ pub mod config;
 pub mod db;
 pub mod enhanced_ocr;
 pub mod file_service;
-pub mod migrations;
 pub mod models;
 pub mod ocr;
 pub mod ocr_queue;
