@@ -8,7 +8,7 @@ use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use crate::{db::Database, ocr::OcrService};
+use crate::{db::Database, enhanced_ocr::EnhancedOcrService};
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct OcrQueueItem {
@@ -204,7 +204,7 @@ impl OcrQueueService {
     }
 
     /// Process a single queue item
-    async fn process_item(&self, item: OcrQueueItem, ocr_service: &OcrService) -> Result<()> {
+    async fn process_item(&self, item: OcrQueueItem, ocr_service: &EnhancedOcrService) -> Result<()> {
         let start_time = std::time::Instant::now();
         
         info!("Processing OCR job {} for document {}", item.id, item.document_id);
@@ -226,35 +226,62 @@ impl OcrQueueService {
                 let file_path: String = row.get("file_path");
                 let mime_type: String = row.get("mime_type");
                 let user_id: Option<Uuid> = row.get("user_id");
-                // Get user's OCR settings
+                // Get user's OCR settings or use defaults
                 let settings = if let Some(user_id) = user_id {
                     self.db.get_user_settings(user_id).await.ok().flatten()
+                        .unwrap_or_else(|| crate::models::Settings::default())
                 } else {
-                    None
+                    crate::models::Settings::default()
                 };
 
-                let ocr_language = settings
-                    .as_ref()
-                    .map(|s| s.ocr_language.clone())
-                    .unwrap_or_else(|| "eng".to_string());
-
-                // Perform OCR
-                match ocr_service.extract_text_with_lang(&file_path, &mime_type, &ocr_language).await {
-                    Ok(text) => {
-                        if !text.is_empty() {
-                            // Update document with OCR text
+                // Perform enhanced OCR
+                match ocr_service.extract_text(&file_path, &mime_type, &settings).await {
+                    Ok(ocr_result) => {
+                        // Validate OCR quality
+                        if !ocr_service.validate_ocr_quality(&ocr_result, &settings) {
+                            let error_msg = format!("OCR quality below threshold: {:.1}% confidence, {} words", 
+                                                   ocr_result.confidence, ocr_result.word_count);
+                            warn!("{}", error_msg);
+                            
+                            // Mark as failed for quality issues
+                            sqlx::query(
+                                r#"
+                                UPDATE documents
+                                SET ocr_status = 'failed',
+                                    ocr_error = $2,
+                                    updated_at = NOW()
+                                WHERE id = $1
+                                "#
+                            )
+                            .bind(item.document_id)
+                            .bind(&error_msg)
+                            .execute(&self.pool)
+                            .await?;
+                            
+                            self.mark_failed(item.id, &error_msg).await?;
+                            return Ok(());
+                        }
+                        
+                        if !ocr_result.text.is_empty() {
+                            // Update document with enhanced OCR text and metadata
                             sqlx::query(
                                 r#"
                                 UPDATE documents
                                 SET ocr_text = $2,
                                     ocr_status = 'completed',
                                     ocr_completed_at = NOW(),
+                                    ocr_confidence = $3,
+                                    ocr_word_count = $4,
+                                    ocr_processing_time_ms = $5,
                                     updated_at = NOW()
                                 WHERE id = $1
                                 "#
                             )
                             .bind(item.document_id)
-                            .bind(text)
+                            .bind(&ocr_result.text)
+                            .bind(ocr_result.confidence)
+                            .bind(ocr_result.word_count as i32)
+                            .bind(ocr_result.processing_time_ms as i32)
                             .execute(&self.pool)
                             .await?;
                         }
@@ -263,8 +290,9 @@ impl OcrQueueService {
                         self.mark_completed(item.id, processing_time_ms).await?;
                         
                         info!(
-                            "Successfully processed OCR job {} for document {} in {}ms",
-                            item.id, item.document_id, processing_time_ms
+                            "Successfully processed OCR job {} for document {} in {}ms - Enhanced OCR: {:.1}% confidence, {} words, Preprocessing: {:?}",
+                            item.id, item.document_id, processing_time_ms, 
+                            ocr_result.confidence, ocr_result.word_count, ocr_result.preprocessing_applied
                         );
                     }
                     Err(e) => {
@@ -302,7 +330,7 @@ impl OcrQueueService {
     /// Start the worker loop
     pub async fn start_worker(self: Arc<Self>) -> Result<()> {
         let semaphore = Arc::new(Semaphore::new(self.max_concurrent_jobs));
-        let ocr_service = Arc::new(OcrService::new());
+        let ocr_service = Arc::new(EnhancedOcrService::new("/tmp".to_string()));
         
         info!(
             "Starting OCR worker {} with {} concurrent jobs",
