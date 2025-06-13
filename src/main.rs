@@ -12,6 +12,7 @@ mod auth;
 mod batch_ingest;
 mod config;
 mod db;
+mod enhanced_ocr;
 mod file_service;
 mod models;
 mod ocr;

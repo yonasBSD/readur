@@ -11,6 +11,7 @@ tower-http = { version = "0.5", features = ["cors", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "sqlite", "chrono", "uuid"] }
+regex = "1.0"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 bcrypt = "0.15"
@@ -25,6 +26,8 @@ notify = "6"
 mime_guess = "2"
 tesseract = { version = "0.15", optional = true }
 pdf-extract = { version = "0.7", optional = true }
+image = { version = "0.24", features = ["png", "jpeg", "tiff", "bmp"], optional = true }
+imageproc = { version = "0.23", optional = true }
 reqwest = { version = "0.11", features = ["json", "multipart"] }
 dotenvy = "0.15"
 hostname = "0.4"
@@ -35,7 +38,7 @@ utoipa-swagger-ui = { version = "6", features = ["axum"] }
 
 [features]
 default = ["ocr"]
-ocr = ["tesseract", "pdf-extract"]
+ocr = ["tesseract", "pdf-extract", "image", "imageproc"]
 
 [dev-dependencies]
 tempfile = "3"

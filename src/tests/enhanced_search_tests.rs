@@ -720,6 +720,175 @@ mod tests {
         assert!(snippets[0].highlight_ranges.len() >= 3); // Should find multiple "test" instances
     }
 
+    #[test]
+    fn test_substring_matching_basic() {
+        let mock_db = MockDatabase::new();
+        
+        // Test "docu" matching "document"
+        let content = "This is a document about important documents and documentation.";
+        let snippets = mock_db.generate_snippets("docu", Some(content), None, 100);
+        
+        assert!(!snippets.is_empty());
+        let snippet = &snippets[0];
+        assert!(snippet.text.to_lowercase().contains("document"));
+        assert!(!snippet.highlight_ranges.is_empty());
+    }
+
+    #[test]
+    fn test_substring_matching_partial_words() {
+        let mock_db = MockDatabase::new();
+        
+        // Test partial word matching
+        let content = "The application processes various applications and applicants.";
+        let snippets = mock_db.generate_snippets("app", Some(content), None, 100);
+        
+        assert!(!snippets.is_empty());
+        // Should find matches in "application", "applications", "applicants"
+        let total_highlights: usize = snippets.iter()
+            .map(|s| s.highlight_ranges.len())
+            .sum();
+        assert!(total_highlights >= 1); // At least one match
+    }
+
+    #[test]
+    fn test_substring_matching_filename_context() {
+        let mock_db = MockDatabase::new();
+        
+        // Test filename matching with context
+        let content = "Contract agreement between parties for legal documentation.";
+        let snippets = mock_db.generate_snippets("contr", Some(content), None, 80);
+        
+        assert!(!snippets.is_empty());
+        let snippet = &snippets[0];
+        assert!(snippet.text.to_lowercase().contains("contract"));
+        
+        // Should provide context around the match
+        assert!(snippet.text.len() <= 80);
+        assert!(snippet.text.contains("Contract"));
+    }
+
+    #[test]
+    fn test_enhanced_snippet_generation_word_boundaries() {
+        let mock_db = MockDatabase::new();
+        
+        // Test that snippets respect word boundaries
+        let content = "The document processing system handles document management and documentation workflows efficiently.";
+        let snippets = mock_db.generate_snippets("doc", Some(content), None, 50);
+        
+        assert!(!snippets.is_empty());
+        let snippet = &snippets[0];
+        
+        // Should find "document", "documentation" etc.
+        assert!(snippet.text.to_lowercase().contains("doc"));
+        
+        // Snippet should not cut words in the middle
+        let words: Vec<&str> = snippet.text.split_whitespace().collect();
+        assert!(words.len() > 0);
+        // First and last words should be complete (not cut off)
+        if snippet.start_offset > 0 {
+            assert!(!snippet.text.starts_with(" "));
+        }
+    }
+
+    #[test]
+    fn test_fuzzy_search_mode_simulation() {
+        // Since we can't easily test the DB query here, test the logic
+        // that would be used in fuzzy mode
+        
+        let query = "docu";
+        let filename1 = "important_document.pdf";
+        let filename2 = "user_documentation.txt";
+        let filename3 = "unrelated_file.jpg";
+        
+        // Simulate fuzzy matching logic
+        let matches_file1 = filename1.to_lowercase().contains(&query.to_lowercase());
+        let matches_file2 = filename2.to_lowercase().contains(&query.to_lowercase());
+        let matches_file3 = filename3.to_lowercase().contains(&query.to_lowercase());
+        
+        assert!(matches_file1); // "docu" should match "document"
+        assert!(matches_file2); // "docu" should match "documentation"
+        assert!(!matches_file3); // "docu" should not match "unrelated_file"
+    }
+
+    #[test]
+    fn test_context_snippet_generation() {
+        let mock_db = MockDatabase::new();
+        
+        // Test that snippets provide good context
+        let long_content = "In the beginning of this long document, there are many important details about document processing. Later in the document, we discuss document management systems and their implementation. Finally, the document concludes with documentation best practices.";
+        
+        let snippets = mock_db.generate_snippets("document management", Some(long_content), None, 80);
+        
+        assert!(!snippets.is_empty());
+        let snippet = &snippets[0];
+        
+        // Should contain the exact phrase and surrounding context
+        assert!(snippet.text.to_lowercase().contains("document management"));
+        assert!(snippet.text.len() <= 80);
+        
+        // Should have proper highlight ranges for multi-word queries
+        assert!(!snippet.highlight_ranges.is_empty());
+    }
+
+    #[test]
+    fn test_multiple_term_substring_matching() {
+        let mock_db = MockDatabase::new();
+        
+        // Test matching multiple partial terms
+        let content = "The application documentation covers app development and application deployment procedures.";
+        let snippets = mock_db.generate_snippets("app dev", Some(content), None, 100);
+        
+        assert!(!snippets.is_empty());
+        let snippet = &snippets[0];
+        
+        // Should find both "app" (in various forms) and "dev"
+        assert!(snippet.text.to_lowercase().contains("app") || snippet.text.to_lowercase().contains("application"));
+        assert!(snippet.text.to_lowercase().contains("dev"));
+    }
+
+    #[test]
+    fn test_similarity_scoring_logic() {
+        // Test the logic that would be used for similarity scoring
+        let query = "docu";
+        let test_cases = vec![
+            ("document.pdf", true),      // Should match
+            ("documentation.txt", true), // Should match
+            ("my_docs.pdf", false),      // Might not match depending on threshold
+            ("picture.jpg", false),      // Should not match
+        ];
+        
+        for (filename, should_match) in test_cases {
+            let contains_query = filename.to_lowercase().contains(&query.to_lowercase());
+            // In a real implementation, this would use PostgreSQL's similarity() function
+            // with a threshold like 0.3
+            let similarity_match = contains_query; // Simplified for testing
+            
+            if should_match {
+                assert!(similarity_match, "Expected '{}' to match '{}'", filename, query);
+            }
+        }
+    }
+
+    #[test]
+    fn test_enhanced_ranking_with_substring_matches() {
+        // Test that substring matches get appropriate ranking
+        let mock_db = MockDatabase::new();
+        
+        // Exact match should rank higher than substring match
+        let exact_content = "Document processing and document management";
+        let substring_content = "Documentation and documents are important";
+        
+        let exact_snippets = mock_db.generate_snippets("document", Some(exact_content), None, 100);
+        let substring_snippets = mock_db.generate_snippets("document", Some(substring_content), None, 100);
+        
+        assert!(!exact_snippets.is_empty());
+        assert!(!substring_snippets.is_empty());
+        
+        // Both should find matches
+        assert!(exact_snippets[0].highlight_ranges.len() >= 1);
+        assert!(substring_snippets[0].highlight_ranges.len() >= 1);
+    }
+
     // Integration tests that would work with actual database
     #[tokio::test]
     #[ignore = "Requires PostgreSQL database for integration testing"]

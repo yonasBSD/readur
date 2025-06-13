@@ -85,6 +85,15 @@ impl Database {
             .execute(&self.pool)
             .await?;
         
+        // Enhanced indexes for substring matching and similarity
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_documents_filename_trgm ON documents USING GIN(filename gin_trgm_ops)"#)
+            .execute(&self.pool)
+            .await?;
+        
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_documents_content_trgm ON documents USING GIN((COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) gin_trgm_ops)"#)
+            .execute(&self.pool)
+            .await?;
+        
         // Create settings table
         sqlx::query(
             r#"
@@ -107,6 +116,15 @@ impl Database {
                 memory_limit_mb INT DEFAULT 512,
                 cpu_priority VARCHAR(10) DEFAULT 'normal',
                 enable_background_ocr BOOLEAN DEFAULT TRUE,
+                ocr_page_segmentation_mode INT DEFAULT 3,
+                ocr_engine_mode INT DEFAULT 3,
+                ocr_min_confidence REAL DEFAULT 30.0,
+                ocr_dpi INT DEFAULT 300,
+                ocr_enhance_contrast BOOLEAN DEFAULT TRUE,
+                ocr_remove_noise BOOLEAN DEFAULT TRUE,
+                ocr_detect_orientation BOOLEAN DEFAULT TRUE,
+                ocr_whitelist_chars TEXT,
+                ocr_blacklist_chars TEXT,
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             )
@@ -492,28 +510,78 @@ impl Database {
     pub async fn enhanced_search_documents(&self, user_id: Uuid, search: SearchRequest) -> Result<(Vec<EnhancedDocumentResponse>, i64, u64)> {
         let start_time = std::time::Instant::now();
         
-        // Build search query based on search mode
+        // Build search query based on search mode with enhanced substring matching
         let search_mode = search.search_mode.as_ref().unwrap_or(&SearchMode::Simple);
-        let query_function = match search_mode {
-            SearchMode::Simple => "plainto_tsquery",
-            SearchMode::Phrase => "phraseto_tsquery", 
-            SearchMode::Fuzzy => "plainto_tsquery", // Could be enhanced with similarity
-            SearchMode::Boolean => "to_tsquery",
-        };
-
-        let mut query_builder = sqlx::QueryBuilder::new(&format!(
-            r#"
-            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, tags, created_at, updated_at, user_id,
-                   ts_rank(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')), {}('english', "#,
-            query_function
-        ));
         
-        query_builder.push_bind(&search.query);
-        query_builder.push(&format!(")) as rank FROM documents WHERE user_id = "));
-        query_builder.push_bind(user_id);
-        query_builder.push(&format!(" AND to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ {}('english', ", query_function));
-        query_builder.push_bind(&search.query);
-        query_builder.push(")");
+        // For fuzzy mode, we'll use similarity matching which is better for substrings
+        let use_similarity = matches!(search_mode, SearchMode::Fuzzy);
+        
+        let mut query_builder = if use_similarity {
+            // Use trigram similarity for substring matching
+            let mut builder = sqlx::QueryBuilder::new(
+                r#"
+                SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, tags, created_at, updated_at, user_id,
+                       GREATEST(
+                           similarity(filename, "#
+            );
+            builder.push_bind(&search.query);
+            builder.push(r#"),
+                           similarity(COALESCE(content, '') || ' ' || COALESCE(ocr_text, ''), "#);
+            builder.push_bind(&search.query);
+            builder.push(r#"),
+                           ts_rank(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')), plainto_tsquery('english', "#);
+            builder.push_bind(&search.query);
+            builder.push(r#"))
+                       ) as rank
+                FROM documents 
+                WHERE user_id = "#);
+            builder.push_bind(user_id);
+            builder.push(r#" AND (
+                    filename % "#);
+            builder.push_bind(&search.query);
+            builder.push(r#" OR
+                    (COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) % "#);
+            builder.push_bind(&search.query);
+            builder.push(r#" OR
+                    to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ plainto_tsquery('english', "#);
+            builder.push_bind(&search.query);
+            builder.push(r#")
+                )"#);
+            builder
+        } else {
+            // Use traditional full-text search with enhanced ranking
+            let query_function = match search_mode {
+                SearchMode::Simple => "plainto_tsquery",
+                SearchMode::Phrase => "phraseto_tsquery", 
+                SearchMode::Boolean => "to_tsquery",
+                SearchMode::Fuzzy => "plainto_tsquery", // fallback
+            };
+
+            let mut builder = sqlx::QueryBuilder::new(&format!(
+                r#"
+                SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, tags, created_at, updated_at, user_id,
+                       GREATEST(
+                           CASE WHEN filename ILIKE '%' || "#
+            ));
+            builder.push_bind(&search.query);
+            builder.push(&format!(r#"' || '%' THEN 0.8 ELSE 0 END,
+                           ts_rank(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')), {}('english', "#, query_function));
+            builder.push_bind(&search.query);
+            builder.push(&format!(r#"))
+                       ) as rank
+                FROM documents 
+                WHERE user_id = "#));
+            builder.push_bind(user_id);
+            builder.push(&format!(r#" AND (
+                    filename ILIKE '%' || "#));
+            builder.push_bind(&search.query);
+            builder.push(&format!(r#" || '%' OR
+                    to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')) @@ {}('english', "#, query_function));
+            builder.push_bind(&search.query);
+            builder.push(r#")
+                )"#);
+            builder
+        };
 
         if let Some(tags) = &search.tags {
             if !tags.is_empty() {
@@ -574,6 +642,18 @@ impl Database {
             });
         }
 
+        // Get the query function for total count
+        let query_function = if use_similarity {
+            "plainto_tsquery"
+        } else {
+            match search_mode {
+                SearchMode::Simple => "plainto_tsquery",
+                SearchMode::Phrase => "phraseto_tsquery", 
+                SearchMode::Boolean => "to_tsquery",
+                SearchMode::Fuzzy => "plainto_tsquery",
+            }
+        };
+
         let total_row = sqlx::query(&format!(
             r#"
             SELECT COUNT(*) as total FROM documents 
@@ -603,37 +683,102 @@ impl Database {
             (None, None) => return snippets,
         };
 
-        // Simple keyword matching for snippets (could be enhanced with better search algorithms)
-        let _query_terms: Vec<&str> = query.split_whitespace().collect();
+        // Enhanced substring matching for better context
+        let query_terms: Vec<&str> = query.split_whitespace().collect();
         let text_lower = full_text.to_lowercase();
         let query_lower = query.to_lowercase();
 
-        // Find matches
+        // Find exact matches first
+        let mut match_positions = Vec::new();
+        
+        // 1. Look for exact query matches
         for (i, _) in text_lower.match_indices(&query_lower) {
-            let snippet_start = if i >= snippet_length as usize / 2 {
-                i - snippet_length as usize / 2
-            } else {
-                0
-            };
+            match_positions.push((i, query.len(), "exact"));
+        }
+        
+        // 2. Look for individual term matches (substring matching)
+        for term in &query_terms {
+            if term.len() >= 3 { // Only match terms of reasonable length
+                let term_lower = term.to_lowercase();
+                for (i, _) in text_lower.match_indices(&term_lower) {
+                    // Check if this isn't already part of an exact match
+                    let is_duplicate = match_positions.iter().any(|(pos, len, _)| {
+                        i >= *pos && i < *pos + *len
+                    });
+                    if !is_duplicate {
+                        match_positions.push((i, term.len(), "term"));
+                    }
+                }
+            }
+        }
+        
+        // 3. Look for partial word matches (for "docu" -> "document" cases)
+        for term in &query_terms {
+            if term.len() >= 3 {
+                let term_lower = term.to_lowercase();
+                // Find words that start with our search term
+                let words_regex = regex::Regex::new(&format!(r"\b{}[a-zA-Z]*\b", regex::escape(&term_lower))).unwrap();
+                for mat in words_regex.find_iter(&text_lower) {
+                    let is_duplicate = match_positions.iter().any(|(pos, len, _)| {
+                        mat.start() >= *pos && mat.start() < *pos + *len
+                    });
+                    if !is_duplicate {
+                        match_positions.push((mat.start(), mat.end() - mat.start(), "partial"));
+                    }
+                }
+            }
+        }
+
+        // Sort matches by position and remove overlaps
+        match_positions.sort_by_key(|&(pos, _, _)| pos);
+        
+        // Generate snippets around matches
+        for (match_pos, match_len, _match_type) in match_positions.iter().take(5) {
+            let context_size = (snippet_length as usize).saturating_sub(*match_len) / 2;
             
+            let snippet_start = match_pos.saturating_sub(context_size);
             let snippet_end = std::cmp::min(
-                snippet_start + snippet_length as usize,
+                match_pos + match_len + context_size,
                 full_text.len()
             );
 
-            if snippet_start < full_text.len() {
+            // Find word boundaries to avoid cutting words
+            let snippet_start = self.find_word_boundary(&full_text, snippet_start, true);
+            let snippet_end = self.find_word_boundary(&full_text, snippet_end, false);
+
+            if snippet_start < snippet_end && snippet_start < full_text.len() {
                 let snippet_text = &full_text[snippet_start..snippet_end];
                 
-                // Find highlight ranges within this snippet
+                // Find all highlight ranges within this snippet
                 let mut highlight_ranges = Vec::new();
                 let snippet_lower = snippet_text.to_lowercase();
                 
+                // Highlight exact query match
                 for (match_start, _) in snippet_lower.match_indices(&query_lower) {
                     highlight_ranges.push(HighlightRange {
                         start: match_start as i32,
                         end: (match_start + query.len()) as i32,
                     });
                 }
+                
+                // Highlight individual terms if no exact match
+                if highlight_ranges.is_empty() {
+                    for term in &query_terms {
+                        if term.len() >= 3 {
+                            let term_lower = term.to_lowercase();
+                            for (match_start, _) in snippet_lower.match_indices(&term_lower) {
+                                highlight_ranges.push(HighlightRange {
+                                    start: match_start as i32,
+                                    end: (match_start + term.len()) as i32,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Remove duplicate highlights and sort
+                highlight_ranges.sort_by_key(|r| r.start);
+                highlight_ranges.dedup_by_key(|r| r.start);
 
                 snippets.push(SearchSnippet {
                     text: snippet_text.to_string(),
@@ -642,7 +787,7 @@ impl Database {
                     highlight_ranges,
                 });
 
-                // Limit to a few snippets per document
+                // Limit to avoid too many snippets
                 if snippets.len() >= 3 {
                     break;
                 }
@@ -650,6 +795,29 @@ impl Database {
         }
 
         snippets
+    }
+
+    fn find_word_boundary(&self, text: &str, mut pos: usize, search_backward: bool) -> usize {
+        if pos >= text.len() {
+            return text.len();
+        }
+        
+        let chars: Vec<char> = text.chars().collect();
+        
+        if search_backward {
+            // Search backward for word boundary
+            while pos > 0 && chars.get(pos.saturating_sub(1)).map_or(false, |c| c.is_alphanumeric()) {
+                pos = pos.saturating_sub(1);
+            }
+        } else {
+            // Search forward for word boundary
+            while pos < chars.len() && chars.get(pos).map_or(false, |c| c.is_alphanumeric()) {
+                pos += 1;
+            }
+        }
+        
+        // Convert back to byte position
+        chars.iter().take(pos).map(|c| c.len_utf8()).sum()
     }
 
     pub async fn update_document_ocr(&self, id: Uuid, ocr_text: &str) -> Result<()> {
@@ -734,7 +902,10 @@ impl Database {
                max_file_size_mb, allowed_file_types, auto_rotate_images, enable_image_preprocessing,
                search_results_per_page, search_snippet_length, fuzzy_search_threshold,
                retention_days, enable_auto_cleanup, enable_compression, memory_limit_mb,
-               cpu_priority, enable_background_ocr, created_at, updated_at
+               cpu_priority, enable_background_ocr, ocr_page_segmentation_mode, ocr_engine_mode,
+               ocr_min_confidence, ocr_dpi, ocr_enhance_contrast, ocr_remove_noise,
+               ocr_detect_orientation, ocr_whitelist_chars, ocr_blacklist_chars,
+               created_at, updated_at
                FROM settings WHERE user_id = $1"#
         )
         .bind(user_id)
@@ -761,6 +932,15 @@ impl Database {
                 memory_limit_mb: row.get("memory_limit_mb"),
                 cpu_priority: row.get("cpu_priority"),
                 enable_background_ocr: row.get("enable_background_ocr"),
+                ocr_page_segmentation_mode: row.get("ocr_page_segmentation_mode"),
+                ocr_engine_mode: row.get("ocr_engine_mode"),
+                ocr_min_confidence: row.get("ocr_min_confidence"),
+                ocr_dpi: row.get("ocr_dpi"),
+                ocr_enhance_contrast: row.get("ocr_enhance_contrast"),
+                ocr_remove_noise: row.get("ocr_remove_noise"),
+                ocr_detect_orientation: row.get("ocr_detect_orientation"),
+                ocr_whitelist_chars: row.get("ocr_whitelist_chars"),
+                ocr_blacklist_chars: row.get("ocr_blacklist_chars"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             })),
@@ -787,9 +967,11 @@ impl Database {
                 max_file_size_mb, allowed_file_types, auto_rotate_images, enable_image_preprocessing,
                 search_results_per_page, search_snippet_length, fuzzy_search_threshold,
                 retention_days, enable_auto_cleanup, enable_compression, memory_limit_mb,
-                cpu_priority, enable_background_ocr
+                cpu_priority, enable_background_ocr, ocr_page_segmentation_mode, ocr_engine_mode,
+                ocr_min_confidence, ocr_dpi, ocr_enhance_contrast, ocr_remove_noise,
+                ocr_detect_orientation, ocr_whitelist_chars, ocr_blacklist_chars
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
             ON CONFLICT (user_id) DO UPDATE SET
                 ocr_language = $2,
                 concurrent_ocr_jobs = $3,
@@ -807,12 +989,24 @@ impl Database {
                 memory_limit_mb = $15,
                 cpu_priority = $16,
                 enable_background_ocr = $17,
+                ocr_page_segmentation_mode = $18,
+                ocr_engine_mode = $19,
+                ocr_min_confidence = $20,
+                ocr_dpi = $21,
+                ocr_enhance_contrast = $22,
+                ocr_remove_noise = $23,
+                ocr_detect_orientation = $24,
+                ocr_whitelist_chars = $25,
+                ocr_blacklist_chars = $26,
                 updated_at = NOW()
             RETURNING id, user_id, ocr_language, concurrent_ocr_jobs, ocr_timeout_seconds,
                       max_file_size_mb, allowed_file_types, auto_rotate_images, enable_image_preprocessing,
                       search_results_per_page, search_snippet_length, fuzzy_search_threshold,
                       retention_days, enable_auto_cleanup, enable_compression, memory_limit_mb,
-                      cpu_priority, enable_background_ocr, created_at, updated_at
+                      cpu_priority, enable_background_ocr, ocr_page_segmentation_mode, ocr_engine_mode,
+                      ocr_min_confidence, ocr_dpi, ocr_enhance_contrast, ocr_remove_noise,
+                      ocr_detect_orientation, ocr_whitelist_chars, ocr_blacklist_chars,
+                      created_at, updated_at
             "#
         )
         .bind(user_id)
@@ -832,6 +1026,15 @@ impl Database {
         .bind(settings.memory_limit_mb.unwrap_or(current.memory_limit_mb))
         .bind(settings.cpu_priority.as_ref().unwrap_or(&current.cpu_priority))
         .bind(settings.enable_background_ocr.unwrap_or(current.enable_background_ocr))
+        .bind(settings.ocr_page_segmentation_mode.unwrap_or(current.ocr_page_segmentation_mode))
+        .bind(settings.ocr_engine_mode.unwrap_or(current.ocr_engine_mode))
+        .bind(settings.ocr_min_confidence.unwrap_or(current.ocr_min_confidence))
+        .bind(settings.ocr_dpi.unwrap_or(current.ocr_dpi))
+        .bind(settings.ocr_enhance_contrast.unwrap_or(current.ocr_enhance_contrast))
+        .bind(settings.ocr_remove_noise.unwrap_or(current.ocr_remove_noise))
+        .bind(settings.ocr_detect_orientation.unwrap_or(current.ocr_detect_orientation))
+        .bind(settings.ocr_whitelist_chars.as_ref().unwrap_or(&current.ocr_whitelist_chars))
+        .bind(settings.ocr_blacklist_chars.as_ref().unwrap_or(&current.ocr_blacklist_chars))
         .fetch_one(&self.pool)
         .await?;
 
@@ -854,6 +1057,15 @@ impl Database {
             memory_limit_mb: row.get("memory_limit_mb"),
             cpu_priority: row.get("cpu_priority"),
             enable_background_ocr: row.get("enable_background_ocr"),
+            ocr_page_segmentation_mode: row.get("ocr_page_segmentation_mode"),
+            ocr_engine_mode: row.get("ocr_engine_mode"),
+            ocr_min_confidence: row.get("ocr_min_confidence"),
+            ocr_dpi: row.get("ocr_dpi"),
+            ocr_enhance_contrast: row.get("ocr_enhance_contrast"),
+            ocr_remove_noise: row.get("ocr_remove_noise"),
+            ocr_detect_orientation: row.get("ocr_detect_orientation"),
+            ocr_whitelist_chars: row.get("ocr_whitelist_chars"),
+            ocr_blacklist_chars: row.get("ocr_blacklist_chars"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })

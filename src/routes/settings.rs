@@ -61,6 +61,15 @@ async fn get_settings(
                 memory_limit_mb: default.memory_limit_mb,
                 cpu_priority: default.cpu_priority,
                 enable_background_ocr: default.enable_background_ocr,
+                ocr_page_segmentation_mode: default.ocr_page_segmentation_mode,
+                ocr_engine_mode: default.ocr_engine_mode,
+                ocr_min_confidence: default.ocr_min_confidence,
+                ocr_dpi: default.ocr_dpi,
+                ocr_enhance_contrast: default.ocr_enhance_contrast,
+                ocr_remove_noise: default.ocr_remove_noise,
+                ocr_detect_orientation: default.ocr_detect_orientation,
+                ocr_whitelist_chars: default.ocr_whitelist_chars,
+                ocr_blacklist_chars: default.ocr_blacklist_chars,
             }
         },
     };

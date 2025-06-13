@@ -132,8 +132,9 @@ const GlobalSearchBar = ({ sx, ...props }) => {
       const response = await documentService.enhancedSearch({
         query: searchQuery.trim(),
         limit: 5, // Show only top 5 results in global search
-        include_snippets: false, // Don't need snippets for quick search
-        search_mode: 'simple',
+        include_snippets: true, // Include snippets for context
+        snippet_length: 100, // Shorter snippets for quick search
+        search_mode: searchQuery.length < 4 ? 'fuzzy' : 'simple', // Use fuzzy for short queries (substring matching)
       });
 
       clearInterval(progressInterval);
@@ -239,6 +240,76 @@ const GlobalSearchBar = ({ sx, ...props }) => {
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
   };
+
+  // Function to highlight search terms in text (including substrings)
+  const highlightText = useCallback((text, searchTerm) => {
+    if (!searchTerm || !text) return text;
+    
+    const terms = searchTerm.toLowerCase().split(/\s+/).filter(term => term.length >= 2);
+    let highlightedText = text;
+    
+    terms.forEach(term => {
+      const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      highlightedText = highlightedText.replace(regex, (match) => `**${match}**`);
+    });
+    
+    // Split by ** markers and create spans
+    const parts = highlightedText.split(/\*\*(.*?)\*\*/);
+    
+    return parts.map((part, index) => {
+      if (index % 2 === 1) {
+        // This is a highlighted part
+        return (
+          <Box
+            key={index}
+            component="mark"
+            sx={{
+              backgroundColor: 'primary.light',
+              color: 'primary.contrastText',
+              padding: '0 2px',
+              borderRadius: '2px',
+              fontWeight: 600,
+            }}
+          >
+            {part}
+          </Box>
+        );
+      }
+      return part;
+    });
+  }, []);
+
+  // Enhanced search with context snippets
+  const generateContextSnippet = useCallback((filename, searchTerm) => {
+    if (!searchTerm || !filename) return filename;
+    
+    const lowerFilename = filename.toLowerCase();
+    const lowerTerm = searchTerm.toLowerCase();
+    
+    // Find the best match (exact term or substring)
+    const exactMatch = lowerFilename.indexOf(lowerTerm);
+    if (exactMatch !== -1) {
+      // Show context around the match
+      const start = Math.max(0, exactMatch - 10);
+      const end = Math.min(filename.length, exactMatch + searchTerm.length + 10);
+      const snippet = filename.substring(start, end);
+      return start > 0 ? `...${snippet}` : snippet;
+    }
+    
+    // Look for partial word matches
+    const words = filename.split(/[_\-\s\.]/);
+    const matchingWord = words.find(word => 
+      word.toLowerCase().includes(lowerTerm) || lowerTerm.includes(word.toLowerCase())
+    );
+    
+    if (matchingWord) {
+      const wordIndex = words.indexOf(matchingWord);
+      const contextWords = words.slice(Math.max(0, wordIndex - 1), Math.min(words.length, wordIndex + 2));
+      return contextWords.join(' ');
+    }
+    
+    return filename;
+  }, []);
 
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
@@ -434,34 +505,54 @@ const GlobalSearchBar = ({ sx, ...props }) => {
                                   whiteSpace: 'nowrap',
                                 }}
                               >
-                                {doc.original_filename}
+                                {highlightText(generateContextSnippet(doc.original_filename, query), query)}
                               </Typography>
                             }
                             secondary={
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Typography variant="caption" color="text.secondary">
-                                  {formatFileSize(doc.file_size)}
-                                </Typography>
-                                {doc.has_ocr_text && (
-                                  <Chip
-                                    label="OCR"
-                                    size="small"
-                                    color="success"
-                                    variant="outlined"
-                                    sx={{ height: 16, fontSize: '0.6rem' }}
-                                  />
+                              <Box>
+                                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {formatFileSize(doc.file_size)}
+                                  </Typography>
+                                  {doc.has_ocr_text && (
+                                    <Chip
+                                      label="OCR"
+                                      size="small"
+                                      color="success"
+                                      variant="outlined"
+                                      sx={{ height: 16, fontSize: '0.6rem' }}
+                                    />
+                                  )}
+                                  {doc.search_rank && (
+                                    <Chip
+                                      icon={<TrendingIcon sx={{ fontSize: 10 }} />}
+                                      label={`${(doc.search_rank * 100).toFixed(0)}%`}
+                                      size="small"
+                                      color="info"
+                                      variant="outlined"
+                                      sx={{ height: 16, fontSize: '0.6rem' }}
+                                    />
+                                  )}
+                                </Stack>
+                                
+                                {/* Show content snippet if available */}
+                                {doc.snippets && doc.snippets.length > 0 && (
+                                  <Typography 
+                                    variant="caption" 
+                                    color="text.secondary"
+                                    sx={{
+                                      display: 'block',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      fontSize: '0.7rem',
+                                      fontStyle: 'italic',
+                                    }}
+                                  >
+                                    {highlightText(doc.snippets[0].text.substring(0, 80) + '...', query)}
+                                  </Typography>
                                 )}
-                                {doc.search_rank && (
-                                  <Chip
-                                    icon={<TrendingIcon sx={{ fontSize: 10 }} />}
-                                    label={`${(doc.search_rank * 100).toFixed(0)}%`}
-                                    size="small"
-                                    color="info"
-                                    variant="outlined"
-                                    sx={{ height: 16, fontSize: '0.6rem' }}
-                                  />
-                                )}
-                              </Stack>
+                              </Box>
                             }
                           />
                         </ListItem>

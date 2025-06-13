@@ -186,6 +186,15 @@ pub struct Settings {
     pub memory_limit_mb: i32,
     pub cpu_priority: String,
     pub enable_background_ocr: bool,
+    pub ocr_page_segmentation_mode: i32,
+    pub ocr_engine_mode: i32,
+    pub ocr_min_confidence: f32,
+    pub ocr_dpi: i32,
+    pub ocr_enhance_contrast: bool,
+    pub ocr_remove_noise: bool,
+    pub ocr_detect_orientation: bool,
+    pub ocr_whitelist_chars: Option<String>,
+    pub ocr_blacklist_chars: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -208,6 +217,15 @@ pub struct SettingsResponse {
     pub memory_limit_mb: i32,
     pub cpu_priority: String,
     pub enable_background_ocr: bool,
+    pub ocr_page_segmentation_mode: i32,
+    pub ocr_engine_mode: i32,
+    pub ocr_min_confidence: f32,
+    pub ocr_dpi: i32,
+    pub ocr_enhance_contrast: bool,
+    pub ocr_remove_noise: bool,
+    pub ocr_detect_orientation: bool,
+    pub ocr_whitelist_chars: Option<String>,
+    pub ocr_blacklist_chars: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -228,6 +246,15 @@ pub struct UpdateSettings {
     pub memory_limit_mb: Option<i32>,
     pub cpu_priority: Option<String>,
     pub enable_background_ocr: Option<bool>,
+    pub ocr_page_segmentation_mode: Option<i32>,
+    pub ocr_engine_mode: Option<i32>,
+    pub ocr_min_confidence: Option<f32>,
+    pub ocr_dpi: Option<i32>,
+    pub ocr_enhance_contrast: Option<bool>,
+    pub ocr_remove_noise: Option<bool>,
+    pub ocr_detect_orientation: Option<bool>,
+    pub ocr_whitelist_chars: Option<Option<String>>,
+    pub ocr_blacklist_chars: Option<Option<String>>,
 }
 
 impl From<Settings> for SettingsResponse {
@@ -249,6 +276,15 @@ impl From<Settings> for SettingsResponse {
             memory_limit_mb: settings.memory_limit_mb,
             cpu_priority: settings.cpu_priority,
             enable_background_ocr: settings.enable_background_ocr,
+            ocr_page_segmentation_mode: settings.ocr_page_segmentation_mode,
+            ocr_engine_mode: settings.ocr_engine_mode,
+            ocr_min_confidence: settings.ocr_min_confidence,
+            ocr_dpi: settings.ocr_dpi,
+            ocr_enhance_contrast: settings.ocr_enhance_contrast,
+            ocr_remove_noise: settings.ocr_remove_noise,
+            ocr_detect_orientation: settings.ocr_detect_orientation,
+            ocr_whitelist_chars: settings.ocr_whitelist_chars,
+            ocr_blacklist_chars: settings.ocr_blacklist_chars,
         }
     }
 }
@@ -282,6 +318,15 @@ impl Default for Settings {
             memory_limit_mb: 512,
             cpu_priority: "normal".to_string(),
             enable_background_ocr: true,
+            ocr_page_segmentation_mode: 3, // PSM_AUTO_OSD - Fully automatic page segmentation, but no OSD
+            ocr_engine_mode: 3, // OEM_DEFAULT - Default, based on what is available
+            ocr_min_confidence: 30.0, // Minimum confidence threshold (0-100)
+            ocr_dpi: 300, // Optimal DPI for OCR
+            ocr_enhance_contrast: true, // Enable contrast enhancement
+            ocr_remove_noise: true, // Enable noise removal
+            ocr_detect_orientation: true, // Enable orientation detection
+            ocr_whitelist_chars: None, // No character whitelist by default
+            ocr_blacklist_chars: None, // No character blacklist by default
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

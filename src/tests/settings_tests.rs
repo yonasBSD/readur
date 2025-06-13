@@ -57,6 +57,15 @@ mod tests {
             memory_limit_mb: None,
             cpu_priority: None,
             enable_background_ocr: None,
+            ocr_page_segmentation_mode: None,
+            ocr_engine_mode: None,
+            ocr_min_confidence: None,
+            ocr_dpi: None,
+            ocr_enhance_contrast: None,
+            ocr_remove_noise: None,
+            ocr_detect_orientation: None,
+            ocr_whitelist_chars: None,
+            ocr_blacklist_chars: None,
         };
 
         let response = app
@@ -144,6 +153,15 @@ mod tests {
             memory_limit_mb: None,
             cpu_priority: None,
             enable_background_ocr: None,
+            ocr_page_segmentation_mode: None,
+            ocr_engine_mode: None,
+            ocr_min_confidence: None,
+            ocr_dpi: None,
+            ocr_enhance_contrast: None,
+            ocr_remove_noise: None,
+            ocr_detect_orientation: None,
+            ocr_whitelist_chars: None,
+            ocr_blacklist_chars: None,
         };
 
         let response = app
