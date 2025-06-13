@@ -199,6 +199,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon: Ico
 // Recent Documents Component
 const RecentDocuments: React.FC<RecentDocumentsProps> = ({ documents = [] }) => {
   const navigate = useNavigate();
+  const theme = useTheme();
 
   const getFileIcon = (mimeType?: string): React.ComponentType<any> => {
     if (mimeType?.includes('pdf')) return PdfIcon;
@@ -227,9 +228,13 @@ const RecentDocuments: React.FC<RecentDocumentsProps> = ({ documents = [] }) => 
 
   return (
     <Card elevation={0} sx={{
-      background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)',
+      background: theme.palette.mode === 'light'
+        ? 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)'
+        : 'linear-gradient(180deg, rgba(40,40,40,0.95) 0%, rgba(25,25,25,0.95) 100%)',
       backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(226,232,240,0.5)',
+      border: theme.palette.mode === 'light'
+        ? '1px solid rgba(226,232,240,0.5)'
+        : '1px solid rgba(255,255,255,0.1)',
       borderRadius: 3,
     }}>
       <CardContent sx={{ p: 3 }}>
@@ -237,7 +242,9 @@ const RecentDocuments: React.FC<RecentDocumentsProps> = ({ documents = [] }) => 
           <Typography variant="h6" sx={{ 
             fontWeight: 700,
             letterSpacing: '-0.025em',
-            background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+            background: theme.palette.mode === 'light'
+              ? 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)'
+              : 'linear-gradient(135deg, #f8fafc 0%, #a855f7 100%)',
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -365,6 +372,7 @@ const RecentDocuments: React.FC<RecentDocumentsProps> = ({ documents = [] }) => 
 // Quick Actions Component
 const QuickActions: React.FC = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   
   const actions: QuickAction[] = [
     {
@@ -392,16 +400,22 @@ const QuickActions: React.FC = () => {
 
   return (
     <Card elevation={0} sx={{
-      background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)',
+      background: theme.palette.mode === 'light'
+        ? 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)'
+        : 'linear-gradient(180deg, rgba(40,40,40,0.95) 0%, rgba(25,25,25,0.95) 100%)',
       backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(226,232,240,0.5)',
+      border: theme.palette.mode === 'light'
+        ? '1px solid rgba(226,232,240,0.5)'
+        : '1px solid rgba(255,255,255,0.1)',
       borderRadius: 3,
     }}>
       <CardContent sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ 
           fontWeight: 700,
           letterSpacing: '-0.025em',
-          background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+          background: theme.palette.mode === 'light'
+            ? 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)'
+            : 'linear-gradient(135deg, #f8fafc 0%, #a855f7 100%)',
           backgroundClip: 'text',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -417,9 +431,13 @@ const QuickActions: React.FC = () => {
                 sx={{
                   p: 2.5,
                   cursor: 'pointer',
-                  border: '1px solid rgba(226,232,240,0.5)',
+                  border: theme.palette.mode === 'light'
+                    ? '1px solid rgba(226,232,240,0.5)'
+                    : '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 3,
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+                  background: theme.palette.mode === 'light'
+                    ? 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)'
+                    : 'linear-gradient(135deg, rgba(50,50,50,0.8) 0%, rgba(30,30,30,0.6) 100%)',
                   backdropFilter: 'blur(10px)',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   '&:hover': {
@@ -527,7 +545,9 @@ const Dashboard: React.FC = () => {
           fontWeight: 800, 
           mb: 1,
           letterSpacing: '-0.025em',
-          background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+          background: theme.palette.mode === 'light'
+            ? 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)'
+            : 'linear-gradient(135deg, #f8fafc 0%, #a855f7 100%)',
           backgroundClip: 'text',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',

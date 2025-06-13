@@ -22,8 +22,10 @@ const ThemeToggle: React.FC<ThemeToggleProps> = ({
         size={size}
         sx={{
           transition: 'all 0.3s ease-in-out',
+          color: mode === 'light' ? '#6366f1' : '#fbbf24',
           '&:hover': {
             transform: 'rotate(180deg)',
+            color: mode === 'light' ? '#4f46e5' : '#f59e0b',
           },
         }}
       >

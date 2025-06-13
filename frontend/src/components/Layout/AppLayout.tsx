@@ -146,7 +146,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <Typography variant="h6" sx={{ 
               fontWeight: 800, 
               color: 'text.primary',
-              background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+              background: theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)'
+                : 'linear-gradient(135deg, #f8fafc 0%, #a855f7 100%)',
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
@@ -248,8 +250,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       {/* User Info */}
       <Box sx={{ 
         p: 3, 
-        borderTop: '1px solid rgba(226,232,240,0.3)',
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(139,92,246,0.03) 100%)',
+        borderTop: theme.palette.mode === 'light'
+          ? '1px solid rgba(226,232,240,0.3)'
+          : '1px solid rgba(255,255,255,0.1)',
+        background: theme.palette.mode === 'light'
+          ? 'linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(139,92,246,0.03) 100%)'
+          : 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%)',
       }}>
         <Box sx={{ 
           display: 'flex', 
@@ -257,10 +263,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           gap: 2.5,
           p: 2,
           borderRadius: 3,
-          background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+          background: theme.palette.mode === 'light'
+            ? 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)'
+            : 'linear-gradient(135deg, rgba(50,50,50,0.8) 0%, rgba(30,30,30,0.6) 100%)',
           backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.3)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+          border: theme.palette.mode === 'light'
+            ? '1px solid rgba(255,255,255,0.3)'
+            : '1px solid rgba(255,255,255,0.1)',
+          boxShadow: theme.palette.mode === 'light'
+            ? '0 4px 16px rgba(0,0,0,0.04)'
+            : '0 4px 16px rgba(0,0,0,0.2)',
         }}>
           <Avatar
             sx={{
@@ -338,7 +350,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ 
             fontWeight: 700, 
             mr: 2,
-            background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+            background: theme.palette.mode === 'light'
+              ? 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)'
+              : 'linear-gradient(135deg, #f8fafc 0%, #a855f7 100%)',
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -357,9 +371,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             sx={{ 
               mr: 2,
               color: 'text.secondary',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+              background: theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)'
+                : 'linear-gradient(135deg, rgba(50,50,50,0.8) 0%, rgba(30,30,30,0.6) 100%)',
               backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255,255,255,0.3)',
+              border: theme.palette.mode === 'light'
+                ? '1px solid rgba(255,255,255,0.3)'
+                : '1px solid rgba(255,255,255,0.1)',
               borderRadius: 2.5,
               width: 44,
               height: 44,
@@ -412,9 +430,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             onClick={handleProfileMenuOpen}
             sx={{ 
               color: 'text.secondary',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+              background: theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)'
+                : 'linear-gradient(135deg, rgba(50,50,50,0.8) 0%, rgba(30,30,30,0.6) 100%)',
               backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255,255,255,0.3)',
+              border: theme.palette.mode === 'light'
+                ? '1px solid rgba(255,255,255,0.3)'
+                : '1px solid rgba(255,255,255,0.1)',
               borderRadius: 2.5,
               width: 44,
               height: 44,

@@ -1186,7 +1186,7 @@ const SearchPage: React.FC = () => {
                                   sx={{
                                     p: 1.5,
                                     mb: 1,
-                                    backgroundColor: 'grey.50',
+                                    backgroundColor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'grey.800',
                                     borderLeft: '3px solid',
                                     borderLeftColor: 'primary.main',
                                   }}

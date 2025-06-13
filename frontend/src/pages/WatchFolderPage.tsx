@@ -116,7 +116,15 @@ const WatchFolderPage: React.FC = () => {
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 600 }}>
+        <Typography variant="h4" sx={{ 
+          fontWeight: 600,
+          background: theme.palette.mode === 'light'
+            ? 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)'
+            : 'linear-gradient(135deg, #f8fafc 0%, #a855f7 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
           Watch Folder
         </Typography>
         <Button
@@ -148,7 +156,13 @@ const WatchFolderPage: React.FC = () => {
                 <Typography variant="body2" color="text.secondary">
                   Watched Directory
                 </Typography>
-                <Typography variant="body1" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', p: 1, borderRadius: 1 }}>
+                <Typography variant="body1" sx={{ 
+                  fontFamily: 'monospace', 
+                  bgcolor: theme.palette.mode === 'light' ? 'grey.100' : 'grey.800', 
+                  p: 1, 
+                  borderRadius: 1,
+                  color: 'text.primary',
+                }}>
                   {watchConfig.watchFolder}
                 </Typography>
               </Box>
@@ -271,7 +285,12 @@ const WatchFolderPage: React.FC = () => {
 
             <Grid container spacing={2} sx={{ mt: 2 }}>
               <Grid item xs={12} md={6}>
-                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: theme.palette.mode === 'light' ? 'grey.50' : 'grey.800', 
+                  borderRadius: 2,
+                  border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                     Average Wait Time
                   </Typography>
@@ -281,7 +300,12 @@ const WatchFolderPage: React.FC = () => {
                 </Box>
               </Grid>
               <Grid item xs={12} md={6}>
-                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: theme.palette.mode === 'light' ? 'grey.50' : 'grey.800', 
+                  borderRadius: 2,
+                  border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                     Oldest Pending Item
                   </Typography>

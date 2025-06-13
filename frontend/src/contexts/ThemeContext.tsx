@@ -40,9 +40,10 @@ const createAppTheme = (mode: PaletteMode): Theme => {
         paper: mode === 'light' ? '#ffffff' : '#1e1e1e',
       },
       text: {
-        primary: mode === 'light' ? '#333333' : '#ffffff',
-        secondary: mode === 'light' ? '#666666' : '#b0b0b0',
+        primary: mode === 'light' ? '#333333' : '#f8fafc',
+        secondary: mode === 'light' ? '#666666' : '#cbd5e1',
       },
+      divider: mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)',
     },
     typography: {
       fontFamily: [
@@ -109,6 +110,20 @@ const createAppTheme = (mode: PaletteMode): Theme => {
             borderRight: mode === 'light' 
               ? '1px solid rgba(0, 0, 0, 0.12)' 
               : '1px solid rgba(255, 255, 255, 0.12)',
+          },
+        },
+      },
+      MuiTextField: {
+        styleOverrides: {
+          root: {
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                borderColor: mode === 'light' ? 'rgba(0, 0, 0, 0.23)' : 'rgba(255, 255, 255, 0.23)',
+              },
+              '&:hover fieldset': {
+                borderColor: mode === 'light' ? 'rgba(0, 0, 0, 0.87)' : 'rgba(255, 255, 255, 0.87)',
+              },
+            },
           },
         },
       },
