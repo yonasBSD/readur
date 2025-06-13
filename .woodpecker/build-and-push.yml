@@ -1,0 +1,39 @@
+steps:
+  clone:
+    image: woodpeckerci/plugin-git
+    settings:
+      skip_verify: true
+
+  build-server:
+    image: woodpeckerci/plugin-docker-buildx
+    settings:
+      registry: gitea.perfectra1n.com
+      repo: gitea.perfectra1n.com/perfectra1n/readur-server
+      dockerfile: server/Dockerfile
+      context: .
+      tags:
+        - latest
+        - ${CI_COMMIT_TAG}
+      username:
+        from_secret: GITEA_USERNAME
+      password:
+        from_secret: GITEA_PASSWORD
+
+  build-client:
+    image: woodpeckerci/plugin-docker-buildx
+    settings:
+      registry: gitea.perfectra1n.com
+      repo: gitea.perfectra1n.com/perfectra1n/readur-client
+      dockerfile: client/Dockerfile
+      context: .
+      tags:
+        - latest
+        - ${CI_COMMIT_TAG}
+      username:
+        from_secret: GITEA_USERNAME
+      password:
+        from_secret: GITEA_PASSWORD
+
+when:
+  event:
+    - tag
