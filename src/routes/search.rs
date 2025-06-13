@@ -30,8 +30,9 @@ pub fn router() -> Router<Arc<AppState>> {
         SearchRequest
     ),
     responses(
-        (status = 200, description = "Search results", body = SearchResponse),
-        (status = 401, description = "Unauthorized")
+        (status = 200, description = "Enhanced search results with relevance ranking, text snippets, and OCR-extracted content matching", body = SearchResponse),
+        (status = 401, description = "Unauthorized - valid authentication required"),
+        (status = 500, description = "Internal server error")
     )
 )]
 async fn search_documents(

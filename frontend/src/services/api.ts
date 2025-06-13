@@ -72,6 +72,15 @@ export interface SearchResponse {
   suggestions: string[]
 }
 
+export interface QueueStats {
+  pending_count: number
+  processing_count: number
+  failed_count: number
+  completed_today: number
+  avg_wait_time_minutes?: number
+  oldest_pending_minutes?: number
+}
+
 export const documentService = {
   upload: (file: File) => {
     const formData = new FormData()
@@ -110,5 +119,15 @@ export const documentService = {
         search_mode: searchRequest.search_mode ?? 'simple',
       },
     })
+  },
+}
+
+export const queueService = {
+  getStats: () => {
+    return api.get<QueueStats>('/queue/stats')
+  },
+
+  requeueFailed: () => {
+    return api.post('/queue/requeue-failed')
   },
 }

@@ -373,7 +373,7 @@ impl Database {
     pub async fn get_documents_by_user(&self, user_id: Uuid, limit: i64, offset: i64) -> Result<Vec<Document>> {
         let rows = sqlx::query(
             r#"
-            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, tags, created_at, updated_at, user_id
+            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id
             FROM documents 
             WHERE user_id = $1 
             ORDER BY created_at DESC 
@@ -416,7 +416,7 @@ impl Database {
     pub async fn find_documents_by_filename(&self, filename: &str) -> Result<Vec<Document>> {
         let rows = sqlx::query(
             r#"
-            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, tags, created_at, updated_at, user_id
+            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id
             FROM documents 
             WHERE filename = $1 OR original_filename = $1
             ORDER BY created_at DESC
@@ -456,7 +456,7 @@ impl Database {
     pub async fn search_documents(&self, user_id: Uuid, search: SearchRequest) -> Result<(Vec<Document>, i64)> {
         let mut query_builder = sqlx::QueryBuilder::new(
             r#"
-            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, tags, created_at, updated_at, user_id,
+            SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id,
                    ts_rank(to_tsvector('english', COALESCE(content, '') || ' ' || COALESCE(ocr_text, '')), plainto_tsquery('english', "# 
         );
         
@@ -550,7 +550,7 @@ impl Database {
             // Use trigram similarity for substring matching
             let mut builder = sqlx::QueryBuilder::new(
                 r#"
-                SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, tags, created_at, updated_at, user_id,
+                SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id,
                        GREATEST(
                            similarity(filename, "#
             );
@@ -589,7 +589,7 @@ impl Database {
 
             let mut builder = sqlx::QueryBuilder::new(&format!(
                 r#"
-                SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, tags, created_at, updated_at, user_id,
+                SELECT id, filename, original_filename, file_path, file_size, mime_type, content, ocr_text, ocr_confidence, ocr_word_count, ocr_processing_time_ms, ocr_status, ocr_error, ocr_completed_at, tags, created_at, updated_at, user_id,
                        GREATEST(
                            CASE WHEN filename ILIKE '%' || "#
             ));

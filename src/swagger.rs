@@ -10,6 +10,9 @@ use crate::{
         DocumentResponse, SearchRequest, SearchResponse, EnhancedDocumentResponse,
         SettingsResponse, UpdateSettings, SearchMode, SearchSnippet, HighlightRange
     },
+    routes::metrics::{
+        SystemMetrics, DatabaseMetrics, OcrMetrics, DocumentMetrics, UserMetrics, GeneralSystemMetrics
+    },
     AppState,
 };
 
@@ -39,12 +42,15 @@ use crate::{
         // Queue endpoints
         crate::routes::queue::get_queue_stats,
         crate::routes::queue::requeue_failed,
+        // Metrics endpoints
+        crate::routes::metrics::get_system_metrics,
     ),
     components(
         schemas(
             CreateUser, LoginRequest, LoginResponse, UserResponse, UpdateUser,
             DocumentResponse, SearchRequest, SearchResponse, EnhancedDocumentResponse,
-            SettingsResponse, UpdateSettings, SearchMode, SearchSnippet, HighlightRange
+            SettingsResponse, UpdateSettings, SearchMode, SearchSnippet, HighlightRange,
+            SystemMetrics, DatabaseMetrics, OcrMetrics, DocumentMetrics, UserMetrics, GeneralSystemMetrics
         )
     ),
     tags(
@@ -54,6 +60,7 @@ use crate::{
         (name = "settings", description = "User settings endpoints"),
         (name = "users", description = "User management endpoints"),
         (name = "queue", description = "OCR queue management endpoints"),
+        (name = "metrics", description = "System metrics and monitoring endpoints"),
     ),
     modifiers(&SecurityAddon),
     info(

@@ -23,8 +23,9 @@ pub fn router() -> Router<Arc<AppState>> {
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "OCR queue statistics"),
-        (status = 401, description = "Unauthorized")
+        (status = 200, description = "OCR queue statistics including pending jobs, processing status, and performance metrics"),
+        (status = 401, description = "Unauthorized - valid authentication required"),
+        (status = 500, description = "Internal server error")
     )
 )]
 async fn get_queue_stats(

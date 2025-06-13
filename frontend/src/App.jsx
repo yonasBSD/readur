@@ -12,6 +12,7 @@ import DocumentsPage from './pages/DocumentsPage';
 import SearchPage from './pages/SearchPage';
 import DocumentDetailsPage from './pages/DocumentDetailsPage';
 import SettingsPage from './pages/SettingsPage';
+import WatchFolderPage from './pages/WatchFolderPage';
 
 function App() {
   const { user, loading } = useAuth();
@@ -63,7 +64,7 @@ function App() {
                   <Route path="/documents" element={<DocumentsPage />} />
                   <Route path="/documents/:id" element={<DocumentDetailsPage />} />
                   <Route path="/search" element={<SearchPage />} />
-                  <Route path="/watch" element={<div>Watch Folder Page - Coming Soon</div>} />
+                  <Route path="/watch" element={<WatchFolderPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/profile" element={<div>Profile Page - Coming Soon</div>} />
                 </Routes>

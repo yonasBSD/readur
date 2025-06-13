@@ -559,6 +559,7 @@ impl EnhancedOcrService {
     }
     
     /// Validate OCR result quality
+    #[cfg(feature = "ocr")]
     pub fn validate_ocr_quality(&self, result: &OcrResult, settings: &Settings) -> bool {
         // Check minimum confidence threshold
         if result.confidence < settings.ocr_min_confidence {

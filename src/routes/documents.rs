@@ -37,12 +37,12 @@ pub fn router() -> Router<Arc<AppState>> {
     security(
         ("bearer_auth" = [])
     ),
-    request_body(content = String, description = "Multipart form data with file", content_type = "multipart/form-data"),
+    request_body(content = String, description = "Multipart form data with file. Supported formats: PDF, PNG, JPG, JPEG, TIFF, BMP, TXT. OCR will be automatically performed on image and PDF files.", content_type = "multipart/form-data"),
     responses(
-        (status = 200, description = "Document uploaded successfully", body = DocumentResponse),
-        (status = 400, description = "Bad request - invalid file or data"),
+        (status = 200, description = "Document uploaded successfully. OCR processing will begin automatically if enabled in user settings.", body = DocumentResponse),
+        (status = 400, description = "Bad request - invalid file type or malformed data"),
         (status = 413, description = "Payload too large - file exceeds size limit"),
-        (status = 401, description = "Unauthorized")
+        (status = 401, description = "Unauthorized - valid authentication required")
     )
 )]
 async fn upload_document(

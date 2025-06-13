@@ -73,6 +73,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
+    // Check if ocr_error column exists
+    let check_column = sqlx::query("SELECT column_name FROM information_schema.columns WHERE table_name = 'documents' AND column_name = 'ocr_error'")
+        .fetch_optional(&db.pool)
+        .await;
+    
+    match check_column {
+        Ok(Some(_)) => info!("✅ ocr_error column exists"),
+        Ok(None) => {
+            error!("❌ ocr_error column is missing! Migration 006 may not have been applied.");
+            // Try to add the column manually as a fallback
+            info!("Attempting to add missing columns...");
+            if let Err(e) = sqlx::query("ALTER TABLE documents ADD COLUMN IF NOT EXISTS ocr_error TEXT")
+                .execute(&db.pool)
+                .await {
+                error!("Failed to add ocr_error column: {}", e);
+            }
+            if let Err(e) = sqlx::query("ALTER TABLE documents ADD COLUMN IF NOT EXISTS ocr_completed_at TIMESTAMPTZ")
+                .execute(&db.pool)
+                .await {
+                error!("Failed to add ocr_completed_at column: {}", e);
+            }
+            info!("Fallback column addition completed");
+        }
+        Err(e) => error!("Failed to check for ocr_error column: {}", e),
+    }
+    
     let result = migrations.run(&db.pool).await;
     match result {
         Ok(_) => info!("SQLx migrations completed successfully"),
@@ -113,6 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/health", get(readur::health_check))
         .nest("/api/auth", routes::auth::router())
         .nest("/api/documents", routes::documents::router())
+        .nest("/api/metrics", routes::metrics::router())
         .nest("/api/queue", routes::queue::router())
         .nest("/api/search", routes::search::router())
         .nest("/api/settings", routes::settings::router())
