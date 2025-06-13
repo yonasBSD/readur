@@ -4,6 +4,7 @@ use axum::{
     routing::get,
     Router,
 };
+use sqlx::Row;
 use std::sync::Arc;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 use tracing::{info, error};
@@ -41,16 +42,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     let db = Database::new(&config.database_url).await?;
     
-    db.migrate().await?;
+    // Don't run the old migration system - let SQLx handle everything
+    // db.migrate().await?;
     
     // Run SQLx migrations
-    sqlx::migrate!("./migrations")
-        .run(&db.pool)
-        .await
-        .map_err(|e| {
-            error!("Failed to run migrations: {}", e);
-            e
-        })?;
+    info!("Running SQLx migrations...");
+    let migrations = sqlx::migrate!("./migrations");
+    info!("Found {} migrations", migrations.migrations.len());
+    
+    for migration in migrations.migrations.iter() {
+        info!("Migration available: {} - {}", migration.version, migration.description);
+    }
+    
+    // Check current migration status
+    let applied_result = sqlx::query("SELECT version, description FROM _sqlx_migrations ORDER BY version")
+        .fetch_all(&db.pool)
+        .await;
+    
+    match applied_result {
+        Ok(rows) => {
+            info!("Currently applied migrations:");
+            for row in rows {
+                let version: i64 = row.get("version");
+                let description: String = row.get("description");
+                info!("  - {} {}", version, description);
+            }
+        }
+        Err(e) => {
+            info!("No existing migrations found (this is normal for first run): {}", e);
+        }
+    }
+    
+    let result = migrations.run(&db.pool).await;
+    match result {
+        Ok(_) => info!("SQLx migrations completed successfully"),
+        Err(e) => {
+            error!("Failed to run SQLx migrations: {}", e);
+            return Err(e.into());
+        }
+    }
     
     // Seed admin user
     seed::seed_admin_user(&db).await?;
