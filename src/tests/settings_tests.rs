@@ -66,6 +66,14 @@ mod tests {
             ocr_detect_orientation: None,
             ocr_whitelist_chars: None,
             ocr_blacklist_chars: None,
+            webdav_enabled: None,
+            webdav_server_url: None,
+            webdav_username: None,
+            webdav_password: None,
+            webdav_watch_folders: None,
+            webdav_file_extensions: None,
+            webdav_auto_sync: None,
+            webdav_sync_interval_minutes: None,
         };
 
         let response = app
@@ -162,6 +170,14 @@ mod tests {
             ocr_detect_orientation: None,
             ocr_whitelist_chars: None,
             ocr_blacklist_chars: None,
+            webdav_enabled: None,
+            webdav_server_url: None,
+            webdav_username: None,
+            webdav_password: None,
+            webdav_watch_folders: None,
+            webdav_file_extensions: None,
+            webdav_auto_sync: None,
+            webdav_sync_interval_minutes: None,
         };
 
         let response = app

@@ -4,7 +4,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use utoipa::{ToSchema, IntoParams};
 
-#[derive(Debug, Serialize, Deserialize, FromRow, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -261,6 +261,14 @@ pub struct Settings {
     pub ocr_detect_orientation: bool,
     pub ocr_whitelist_chars: Option<String>,
     pub ocr_blacklist_chars: Option<String>,
+    pub webdav_enabled: bool,
+    pub webdav_server_url: Option<String>,
+    pub webdav_username: Option<String>,
+    pub webdav_password: Option<String>,
+    pub webdav_watch_folders: Vec<String>,
+    pub webdav_file_extensions: Vec<String>,
+    pub webdav_auto_sync: bool,
+    pub webdav_sync_interval_minutes: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -292,6 +300,14 @@ pub struct SettingsResponse {
     pub ocr_detect_orientation: bool,
     pub ocr_whitelist_chars: Option<String>,
     pub ocr_blacklist_chars: Option<String>,
+    pub webdav_enabled: bool,
+    pub webdav_server_url: Option<String>,
+    pub webdav_username: Option<String>,
+    pub webdav_password: Option<String>,
+    pub webdav_watch_folders: Vec<String>,
+    pub webdav_file_extensions: Vec<String>,
+    pub webdav_auto_sync: bool,
+    pub webdav_sync_interval_minutes: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -321,6 +337,14 @@ pub struct UpdateSettings {
     pub ocr_detect_orientation: Option<bool>,
     pub ocr_whitelist_chars: Option<Option<String>>,
     pub ocr_blacklist_chars: Option<Option<String>>,
+    pub webdav_enabled: Option<bool>,
+    pub webdav_server_url: Option<Option<String>>,
+    pub webdav_username: Option<Option<String>>,
+    pub webdav_password: Option<Option<String>>,
+    pub webdav_watch_folders: Option<Vec<String>>,
+    pub webdav_file_extensions: Option<Vec<String>>,
+    pub webdav_auto_sync: Option<bool>,
+    pub webdav_sync_interval_minutes: Option<i32>,
 }
 
 impl From<Settings> for SettingsResponse {
@@ -351,6 +375,14 @@ impl From<Settings> for SettingsResponse {
             ocr_detect_orientation: settings.ocr_detect_orientation,
             ocr_whitelist_chars: settings.ocr_whitelist_chars,
             ocr_blacklist_chars: settings.ocr_blacklist_chars,
+            webdav_enabled: settings.webdav_enabled,
+            webdav_server_url: settings.webdav_server_url,
+            webdav_username: settings.webdav_username,
+            webdav_password: settings.webdav_password,
+            webdav_watch_folders: settings.webdav_watch_folders,
+            webdav_file_extensions: settings.webdav_file_extensions,
+            webdav_auto_sync: settings.webdav_auto_sync,
+            webdav_sync_interval_minutes: settings.webdav_sync_interval_minutes,
         }
     }
 }
@@ -393,8 +425,68 @@ impl Default for Settings {
             ocr_detect_orientation: true, // Enable orientation detection
             ocr_whitelist_chars: None, // No character whitelist by default
             ocr_blacklist_chars: None, // No character blacklist by default
+            webdav_enabled: false,
+            webdav_server_url: None,
+            webdav_username: None,
+            webdav_password: None,
+            webdav_watch_folders: vec!["/Documents".to_string()],
+            webdav_file_extensions: vec![
+                "pdf".to_string(),
+                "png".to_string(),
+                "jpg".to_string(),
+                "jpeg".to_string(),
+                "tiff".to_string(),
+                "bmp".to_string(),
+                "txt".to_string(),
+            ],
+            webdav_auto_sync: false,
+            webdav_sync_interval_minutes: 60,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct WebDAVFolderInfo {
+    pub path: String,
+    pub total_files: i64,
+    pub supported_files: i64,
+    pub estimated_time_hours: f32,
+    pub total_size_mb: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct WebDAVCrawlEstimate {
+    pub folders: Vec<WebDAVFolderInfo>,
+    pub total_files: i64,
+    pub total_supported_files: i64,
+    pub total_estimated_time_hours: f32,
+    pub total_size_mb: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct WebDAVTestConnection {
+    pub server_url: String,
+    pub username: String,
+    pub password: String,
+    pub server_type: Option<String>, // "nextcloud", "owncloud", "generic"
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct WebDAVConnectionResult {
+    pub success: bool,
+    pub message: String,
+    pub server_version: Option<String>,
+    pub server_type: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct WebDAVSyncStatus {
+    pub is_running: bool,
+    pub last_sync: Option<DateTime<Utc>>,
+    pub files_processed: i64,
+    pub files_remaining: i64,
+    pub current_folder: Option<String>,
+    pub errors: Vec<String>,
 }

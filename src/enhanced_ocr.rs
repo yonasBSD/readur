@@ -608,9 +608,6 @@ impl EnhancedOcrService {
         Err(anyhow::anyhow!("OCR feature not enabled"))
     }
     
-    pub async fn extract_text(&self, _file_path: &str, _mime_type: &str, _settings: &Settings) -> Result<OcrResult> {
-        Err(anyhow::anyhow!("OCR feature not enabled"))
-    }
     
     pub fn validate_ocr_quality(&self, _result: &OcrResult, _settings: &Settings) -> bool {
         false

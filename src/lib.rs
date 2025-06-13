@@ -10,6 +10,7 @@ pub mod ocr_queue;
 pub mod routes;
 pub mod seed;
 pub mod watcher;
+pub mod webdav_service;
 
 #[cfg(test)]
 mod tests;

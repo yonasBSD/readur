@@ -70,6 +70,14 @@ async fn get_settings(
                 ocr_detect_orientation: default.ocr_detect_orientation,
                 ocr_whitelist_chars: default.ocr_whitelist_chars,
                 ocr_blacklist_chars: default.ocr_blacklist_chars,
+                webdav_enabled: default.webdav_enabled,
+                webdav_server_url: default.webdav_server_url,
+                webdav_username: default.webdav_username,
+                webdav_password: default.webdav_password,
+                webdav_watch_folders: default.webdav_watch_folders,
+                webdav_file_extensions: default.webdav_file_extensions,
+                webdav_auto_sync: default.webdav_auto_sync,
+                webdav_sync_interval_minutes: default.webdav_sync_interval_minutes,
             }
         },
     };

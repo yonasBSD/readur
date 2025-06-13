@@ -5,3 +5,4 @@ pub mod queue;
 pub mod search;
 pub mod settings;
 pub mod users;
+pub mod webdav;

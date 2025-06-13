@@ -144,6 +144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api/search", routes::search::router())
         .nest("/api/settings", routes::settings::router())
         .nest("/api/users", routes::users::router())
+        .nest("/api/webdav", routes::webdav::router())
         .merge(swagger::create_swagger_router())
         .nest_service("/", ServeDir::new("/app/frontend"))
         .fallback(serve_spa)

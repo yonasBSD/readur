@@ -21,12 +21,12 @@ import {
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
-  Description as DocumentIcon,
+  Article as DocumentIcon,
   Search as SearchIcon,
   TrendingUp as TrendingUpIcon,
-  Folder as FolderIcon,
-  Speed as SpeedIcon,
-  Assessment as AssessmentIcon,
+  CloudDone as StorageIcon,
+  AutoAwesome as OcrIcon,
+  FindInPage as SearchableIcon,
   Add as AddIcon,
   GetApp as DownloadIcon,
   Visibility as ViewIcon,
@@ -87,53 +87,109 @@ const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon: Ico
     <Card
       elevation={0}
       sx={{
-        background: `linear-gradient(135deg, ${color} 0%, ${alpha(color, 0.8)} 100%)`,
+        background: `linear-gradient(135deg, ${color} 0%, ${alpha(color, 0.85)} 100%)`,
         color: 'white',
         position: 'relative',
         overflow: 'hidden',
+        borderRadius: 3,
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        cursor: 'pointer',
+        border: '1px solid rgba(255,255,255,0.1)',
+        backdropFilter: 'blur(20px)',
+        '&:hover': {
+          transform: 'translateY(-4px)',
+          boxShadow: `0 20px 40px ${alpha(color, 0.3)}`,
+        },
         '&::before': {
           content: '""',
           position: 'absolute',
           top: 0,
           right: 0,
-          width: '100px',
-          height: '100px',
-          background: alpha('#fff', 0.1),
+          width: '120px',
+          height: '120px',
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)',
           borderRadius: '50%',
-          transform: 'translate(30px, -30px)',
+          transform: 'translate(40px, -40px)',
+        },
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+          backdropFilter: 'blur(10px)',
         },
       }}
     >
-      <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+      <CardContent sx={{ position: 'relative', zIndex: 1, p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h3" sx={{ 
+              fontWeight: 800, 
+              mb: 1.5,
+              letterSpacing: '-0.025em',
+              fontSize: { xs: '1.75rem', sm: '2.125rem' },
+            }}>
               {value}
             </Typography>
-            <Typography variant="h6" sx={{ opacity: 0.9, mb: 0.5 }}>
+            <Typography variant="h6" sx={{ 
+              opacity: 0.95, 
+              mb: 0.5,
+              fontWeight: 600,
+              letterSpacing: '0.025em',
+            }}>
               {title}
             </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>
+            <Typography variant="body2" sx={{ 
+              opacity: 0.85,
+              fontWeight: 500,
+              fontSize: '0.875rem',
+            }}>
               {subtitle}
             </Typography>
             {trend && (
-              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                <TrendingUpIcon sx={{ fontSize: 16, mr: 0.5 }} />
-                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1.5 }}>
+                <Box sx={{
+                  p: 0.5,
+                  borderRadius: 1,
+                  background: 'rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  mr: 1,
+                }}>
+                  <TrendingUpIcon sx={{ fontSize: 14 }} />
+                </Box>
+                <Typography variant="caption" sx={{ 
+                  opacity: 0.95,
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  letterSpacing: '0.025em',
+                }}>
                   {trend}
                 </Typography>
               </Box>
             )}
           </Box>
-          <Avatar
-            sx={{
-              bgcolor: alpha('#fff', 0.2),
-              width: 56,
-              height: 56,
-            }}
-          >
-            <Icon sx={{ fontSize: 28 }} />
-          </Avatar>
+          <Box sx={{
+            width: 64,
+            height: 64,
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.15) 100%)',
+            backdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid rgba(255,255,255,0.2)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+          }}>
+            <Icon sx={{ 
+              fontSize: 32,
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+            }} />
+          </Box>
         </Box>
       </CardContent>
     </Card>
@@ -170,23 +226,63 @@ const RecentDocuments: React.FC<RecentDocumentsProps> = ({ documents = [] }) => 
   };
 
   return (
-    <Card elevation={0}>
-      <CardContent>
+    <Card elevation={0} sx={{
+      background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)',
+      backdropFilter: 'blur(20px)',
+      border: '1px solid rgba(226,232,240,0.5)',
+      borderRadius: 3,
+    }}>
+      <CardContent sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ 
+            fontWeight: 700,
+            letterSpacing: '-0.025em',
+            background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>
             Recent Documents
           </Typography>
           <Chip
             label="View All"
             onClick={() => navigate('/documents')}
-            sx={{ cursor: 'pointer' }}
+            sx={{ 
+              cursor: 'pointer',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+              border: '1px solid rgba(99,102,241,0.3)',
+              fontWeight: 600,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                color: 'white',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 8px 24px rgba(99,102,241,0.2)',
+              },
+            }}
           />
         </Box>
         
         {documents.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>
-            <DocumentIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+            <Box sx={{
+              width: 64,
+              height: 64,
+              borderRadius: 3,
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mx: 'auto',
+              mb: 2,
+            }}>
+              <DocumentIcon sx={{ fontSize: 32, color: '#6366f1' }} />
+            </Box>
+            <Typography variant="body1" sx={{ 
+              color: 'text.secondary',
+              fontWeight: 500,
+              mb: 1,
+            }}>
               No documents yet
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -288,16 +384,29 @@ const QuickActions: React.FC = () => {
     {
       title: 'Browse Documents',
       description: 'View and manage your document library',
-      icon: FolderIcon,
+      icon: SearchableIcon,
       color: '#f59e0b',
       path: '/documents',
     },
   ];
 
   return (
-    <Card elevation={0}>
-      <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+    <Card elevation={0} sx={{
+      background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)',
+      backdropFilter: 'blur(20px)',
+      border: '1px solid rgba(226,232,240,0.5)',
+      borderRadius: 3,
+    }}>
+      <CardContent sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ 
+          fontWeight: 700,
+          letterSpacing: '-0.025em',
+          background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          mb: 3,
+        }}>
           Quick Actions
         </Typography>
         <Grid container spacing={2}>
@@ -306,36 +415,49 @@ const QuickActions: React.FC = () => {
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2,
+                  p: 2.5,
                   cursor: 'pointer',
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  transition: 'all 0.2s ease-in-out',
+                  border: '1px solid rgba(226,232,240,0.5)',
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.6) 100%)',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   '&:hover': {
                     borderColor: action.color,
-                    backgroundColor: alpha(action.color, 0.04),
-                    transform: 'translateY(-2px)',
-                    boxShadow: 2,
+                    background: `linear-gradient(135deg, ${alpha(action.color, 0.08)} 0%, ${alpha(action.color, 0.04)} 100%)`,
+                    transform: 'translateY(-4px)',
+                    boxShadow: `0 12px 32px ${alpha(action.color, 0.15)}`,
                   },
                 }}
                 onClick={() => navigate(action.path)}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar
-                    sx={{
-                      bgcolor: action.color,
-                      width: 40,
-                      height: 40,
-                    }}
-                  >
-                    <action.icon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                  <Box sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 3,
+                    background: `linear-gradient(135deg, ${action.color} 0%, ${alpha(action.color, 0.8)} 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    boxShadow: `0 8px 24px ${alpha(action.color, 0.3)}`,
+                  }}>
+                    <action.icon sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" sx={{ 
+                      fontWeight: 700,
+                      letterSpacing: '0.025em',
+                      mb: 0.5,
+                    }}>
                       {action.title}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{
+                      color: 'text.secondary',
+                      fontWeight: 500,
+                      fontSize: '0.875rem',
+                    }}>
                       {action.description}
                     </Typography>
                   </Box>
@@ -401,10 +523,22 @@ const Dashboard: React.FC = () => {
     <Box>
       {/* Welcome Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+        <Typography variant="h4" sx={{ 
+          fontWeight: 800, 
+          mb: 1,
+          letterSpacing: '-0.025em',
+          background: 'linear-gradient(135deg, #1e293b 0%, #6366f1 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
           Welcome back, {user?.username}! 👋
         </Typography>
-        <Typography variant="h6" color="text.secondary">
+        <Typography variant="h6" sx={{
+          color: 'text.secondary',
+          fontWeight: 500,
+          letterSpacing: '0.025em',
+        }}>
           Here's what's happening with your documents today.
         </Typography>
       </Box>
@@ -417,7 +551,7 @@ const Dashboard: React.FC = () => {
             value={loading ? '...' : stats.totalDocuments}
             subtitle="Files in your library"
             icon={DocumentIcon}
-            color={theme.palette.primary.main}
+            color="#6366f1"
             trend="+12% this month"
           />
         </Grid>
@@ -426,8 +560,8 @@ const Dashboard: React.FC = () => {
             title="Storage Used"
             value={loading ? '...' : formatBytes(stats.totalSize)}
             subtitle="Total file size"
-            icon={FolderIcon}
-            color={theme.palette.success.main}
+            icon={StorageIcon}
+            color="#10b981"
             trend="+2.4 GB this week"
           />
         </Grid>
@@ -436,8 +570,8 @@ const Dashboard: React.FC = () => {
             title="OCR Processed"
             value={loading ? '...' : stats.ocrProcessed}
             subtitle="Text extracted documents"
-            icon={SpeedIcon}
-            color={theme.palette.warning.main}
+            icon={OcrIcon}
+            color="#f59e0b"
             trend={`${Math.round((stats.ocrProcessed / Math.max(stats.totalDocuments, 1)) * 100)}% completion`}
           />
         </Grid>
@@ -446,8 +580,8 @@ const Dashboard: React.FC = () => {
             title="Searchable"
             value={loading ? '...' : stats.searchablePages}
             subtitle="Ready for search"
-            icon={AssessmentIcon}
-            color={theme.palette.secondary.main}
+            icon={SearchableIcon}
+            color="#8b5cf6"
             trend="100% indexed"
           />
         </Grid>
@@ -468,16 +602,40 @@ const Dashboard: React.FC = () => {
         color="primary"
         sx={{
           position: 'fixed',
-          bottom: 24,
-          right: 24,
+          bottom: 32,
+          right: 32,
+          width: 64,
+          height: 64,
           background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 16px 40px rgba(99,102,241,0.3)',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           '&:hover': {
             background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+            transform: 'translateY(-4px) scale(1.05)',
+            boxShadow: '0 20px 50px rgba(99,102,241,0.4)',
+          },
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)',
+            backdropFilter: 'blur(10px)',
           },
         }}
         onClick={() => navigate('/upload')}
       >
-        <AddIcon />
+        <AddIcon sx={{ 
+          fontSize: 28,
+          position: 'relative',
+          zIndex: 1,
+          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+        }} />
       </Fab>
     </Box>
   );

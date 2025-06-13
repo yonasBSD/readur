@@ -32,8 +32,12 @@ import {
   Divider,
   Switch,
   SelectChangeEvent,
+  Chip,
+  LinearProgress,
 } from '@mui/material';
-import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
+import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, 
+         CloudSync as CloudSyncIcon, Folder as FolderIcon,
+         Assessment as AssessmentIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
@@ -61,6 +65,14 @@ interface Settings {
   memoryLimitMb: number;
   cpuPriority: string;
   enableBackgroundOcr: boolean;
+  webdavEnabled: boolean;
+  webdavServerUrl: string;
+  webdavUsername: string;
+  webdavPassword: string;
+  webdavWatchFolders: string[];
+  webdavFileExtensions: string[];
+  webdavAutoSync: boolean;
+  webdavSyncIntervalMinutes: number;
 }
 
 interface SnackbarState {
@@ -86,6 +98,406 @@ interface OcrLanguage {
   name: string;
 }
 
+interface WebDAVFolderInfo {
+  path: string;
+  total_files: number;
+  supported_files: number;
+  estimated_time_hours: number;
+  total_size_mb: number;
+}
+
+interface WebDAVCrawlEstimate {
+  folders: WebDAVFolderInfo[];
+  total_files: number;
+  total_supported_files: number;
+  total_estimated_time_hours: number;
+  total_size_mb: number;
+}
+
+interface WebDAVConnectionResult {
+  success: boolean;
+  message: string;
+  server_version?: string;
+  server_type?: string;
+}
+
+interface WebDAVTabContentProps {
+  settings: Settings;
+  loading: boolean;
+  onSettingsChange: (key: keyof Settings, value: any) => Promise<void>;
+  onShowSnackbar: (message: string, severity: 'success' | 'error' | 'warning' | 'info') => void;
+}
+
+const WebDAVTabContent: React.FC<WebDAVTabContentProps> = ({ 
+  settings, 
+  loading, 
+  onSettingsChange, 
+  onShowSnackbar 
+}) => {
+  const [connectionResult, setConnectionResult] = useState<WebDAVConnectionResult | null>(null);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [crawlEstimate, setCrawlEstimate] = useState<WebDAVCrawlEstimate | null>(null);
+  const [estimatingCrawl, setEstimatingCrawl] = useState(false);
+  const [newFolder, setNewFolder] = useState('');
+
+  const testConnection = async () => {
+    if (!settings.webdavServerUrl || !settings.webdavUsername || !settings.webdavPassword) {
+      onShowSnackbar('Please fill in all WebDAV connection details', 'warning');
+      return;
+    }
+
+    setTestingConnection(true);
+    try {
+      const response = await api.post('/webdav/test-connection', {
+        server_url: settings.webdavServerUrl,
+        username: settings.webdavUsername,
+        password: settings.webdavPassword,
+        server_type: 'nextcloud'
+      });
+      setConnectionResult(response.data);
+      onShowSnackbar(response.data.message, response.data.success ? 'success' : 'error');
+    } catch (error: any) {
+      console.error('Connection test failed:', error);
+      setConnectionResult({
+        success: false,
+        message: 'Connection test failed'
+      });
+      onShowSnackbar('Connection test failed', 'error');
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  const estimateCrawl = async () => {
+    if (!settings.webdavEnabled || settings.webdavWatchFolders.length === 0) {
+      onShowSnackbar('Please enable WebDAV and configure folders first', 'warning');
+      return;
+    }
+
+    setEstimatingCrawl(true);
+    try {
+      const response = await api.post('/webdav/estimate-crawl', {
+        folders: settings.webdavWatchFolders
+      });
+      setCrawlEstimate(response.data);
+      onShowSnackbar('Crawl estimation completed', 'success');
+    } catch (error: any) {
+      console.error('Crawl estimation failed:', error);
+      onShowSnackbar('Failed to estimate crawl', 'error');
+    } finally {
+      setEstimatingCrawl(false);
+    }
+  };
+
+  const addFolder = () => {
+    if (newFolder && !settings.webdavWatchFolders.includes(newFolder)) {
+      onSettingsChange('webdavWatchFolders', [...settings.webdavWatchFolders, newFolder]);
+      setNewFolder('');
+    }
+  };
+
+  const removeFolder = (folderToRemove: string) => {
+    onSettingsChange('webdavWatchFolders', settings.webdavWatchFolders.filter(f => f !== folderToRemove));
+  };
+
+  const serverTypes = [
+    { value: 'nextcloud', label: 'Nextcloud' },
+    { value: 'owncloud', label: 'ownCloud' },
+    { value: 'generic', label: 'Generic WebDAV' },
+  ];
+
+  return (
+    <Box>
+      <Typography variant="h6" sx={{ mb: 3 }}>
+        WebDAV Integration
+      </Typography>
+      <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
+        Connect to your WebDAV server (Nextcloud, ownCloud, etc.) to automatically discover and OCR files.
+      </Typography>
+
+      {/* Connection Configuration */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="subtitle1" sx={{ mb: 2 }}>
+            <CloudSyncIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            Connection Settings
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <FormControl sx={{ mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={settings.webdavEnabled}
+                      onChange={(e) => onSettingsChange('webdavEnabled', e.target.checked)}
+                      disabled={loading}
+                    />
+                  }
+                  label="Enable WebDAV Integration"
+                />
+                <Typography variant="body2" color="text.secondary">
+                  Enable automatic file discovery and synchronization from WebDAV server
+                </Typography>
+              </FormControl>
+            </Grid>
+
+            {settings.webdavEnabled && (
+              <>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Server URL"
+                    value={settings.webdavServerUrl}
+                    onChange={(e) => onSettingsChange('webdavServerUrl', e.target.value)}
+                    disabled={loading}
+                    placeholder="https://cloud.example.com"
+                    helperText="Full URL to your WebDAV server"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Server Type</InputLabel>
+                    <Select
+                      value="nextcloud"
+                      label="Server Type"
+                      disabled={loading}
+                    >
+                      {serverTypes.map((type) => (
+                        <MenuItem key={type.value} value={type.value}>
+                          {type.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Username"
+                    value={settings.webdavUsername}
+                    onChange={(e) => onSettingsChange('webdavUsername', e.target.value)}
+                    disabled={loading}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Password / App Password"
+                    type="password"
+                    value={settings.webdavPassword}
+                    onChange={(e) => onSettingsChange('webdavPassword', e.target.value)}
+                    disabled={loading}
+                    helperText="For Nextcloud/ownCloud, use an app password"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Button
+                    variant="outlined"
+                    onClick={testConnection}
+                    disabled={testingConnection || loading}
+                    sx={{ mr: 2 }}
+                  >
+                    {testingConnection ? 'Testing...' : 'Test Connection'}
+                  </Button>
+                  {connectionResult && (
+                    <Alert severity={connectionResult.success ? 'success' : 'error'} sx={{ mt: 2 }}>
+                      {connectionResult.message}
+                      {connectionResult.server_version && (
+                        <Typography variant="body2">
+                          Server: {connectionResult.server_type} v{connectionResult.server_version}
+                        </Typography>
+                      )}
+                    </Alert>
+                  )}
+                </Grid>
+              </>
+            )}
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Folder Configuration */}
+      {settings.webdavEnabled && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="subtitle1" sx={{ mb: 2 }}>
+              <FolderIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              Folders to Monitor
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            
+            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+              Specify which folders to scan for files. Use absolute paths starting with "/".
+            </Typography>
+
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                label="Add Folder Path"
+                value={newFolder}
+                onChange={(e) => setNewFolder(e.target.value)}
+                placeholder="/Documents"
+                disabled={loading}
+                sx={{ mr: 1, minWidth: 200 }}
+              />
+              <Button variant="outlined" onClick={addFolder} disabled={!newFolder || loading}>
+                Add Folder
+              </Button>
+            </Box>
+
+            <Box sx={{ mb: 2 }}>
+              {settings.webdavWatchFolders.map((folder, index) => (
+                <Chip
+                  key={index}
+                  label={folder}
+                  onDelete={() => removeFolder(folder)}
+                  disabled={loading}
+                  sx={{ mr: 1, mb: 1 }}
+                />
+              ))}
+            </Box>
+
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Sync Interval (minutes)"
+                  value={settings.webdavSyncIntervalMinutes}
+                  onChange={(e) => onSettingsChange('webdavSyncIntervalMinutes', parseInt(e.target.value))}
+                  disabled={loading}
+                  inputProps={{ min: 15, max: 1440 }}
+                  helperText="How often to check for new files"
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl sx={{ mt: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={settings.webdavAutoSync}
+                        onChange={(e) => onSettingsChange('webdavAutoSync', e.target.checked)}
+                        disabled={loading}
+                      />
+                    }
+                    label="Enable Automatic Sync"
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    Automatically sync files on the configured interval
+                  </Typography>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Crawl Estimation */}
+      {settings.webdavEnabled && connectionResult?.success && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="subtitle1" sx={{ mb: 2 }}>
+              <AssessmentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              Crawl Estimation
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            
+            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+              Estimate how many files will be processed and how long it will take.
+            </Typography>
+
+            <Button
+              variant="outlined"
+              onClick={estimateCrawl}
+              disabled={estimatingCrawl || loading}
+              sx={{ mb: 2 }}
+            >
+              {estimatingCrawl ? 'Estimating...' : 'Estimate Crawl'}
+            </Button>
+
+            {estimatingCrawl && (
+              <Box sx={{ mb: 2 }}>
+                <LinearProgress />
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Analyzing folders and counting files...
+                </Typography>
+              </Box>
+            )}
+
+            {crawlEstimate && (
+              <Box>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Estimation Results
+                </Typography>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid item xs={12} md={3}>
+                    <Paper sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="h4" color="primary">
+                        {crawlEstimate.total_files.toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2">Total Files</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <Paper sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="h4" color="success.main">
+                        {crawlEstimate.total_supported_files.toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2">Supported Files</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <Paper sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="h4" color="warning.main">
+                        {crawlEstimate.total_estimated_time_hours.toFixed(1)}h
+                      </Typography>
+                      <Typography variant="body2">Estimated Time</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <Paper sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="h4" color="info.main">
+                        {(crawlEstimate.total_size_mb / 1024).toFixed(1)}GB
+                      </Typography>
+                      <Typography variant="body2">Total Size</Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                <TableContainer component={Paper}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Folder</TableCell>
+                        <TableCell align="right">Total Files</TableCell>
+                        <TableCell align="right">Supported</TableCell>
+                        <TableCell align="right">Est. Time</TableCell>
+                        <TableCell align="right">Size (MB)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {crawlEstimate.folders.map((folder) => (
+                        <TableRow key={folder.path}>
+                          <TableCell>{folder.path}</TableCell>
+                          <TableCell align="right">{folder.total_files.toLocaleString()}</TableCell>
+                          <TableCell align="right">{folder.supported_files.toLocaleString()}</TableCell>
+                          <TableCell align="right">{folder.estimated_time_hours.toFixed(1)}h</TableCell>
+                          <TableCell align="right">{folder.total_size_mb.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </Box>
+  );
+};
+
 const SettingsPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [tabValue, setTabValue] = useState<number>(0);
@@ -106,6 +518,14 @@ const SettingsPage: React.FC = () => {
     memoryLimitMb: 512,
     cpuPriority: 'normal',
     enableBackgroundOcr: true,
+    webdavEnabled: false,
+    webdavServerUrl: '',
+    webdavUsername: '',
+    webdavPassword: '',
+    webdavWatchFolders: ['/Documents'],
+    webdavFileExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'tiff', 'bmp', 'txt'],
+    webdavAutoSync: false,
+    webdavSyncIntervalMinutes: 60,
   });
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -168,6 +588,14 @@ const SettingsPage: React.FC = () => {
         memoryLimitMb: response.data.memory_limit_mb || 512,
         cpuPriority: response.data.cpu_priority || 'normal',
         enableBackgroundOcr: response.data.enable_background_ocr !== undefined ? response.data.enable_background_ocr : true,
+        webdavEnabled: response.data.webdav_enabled || false,
+        webdavServerUrl: response.data.webdav_server_url || '',
+        webdavUsername: response.data.webdav_username || '',
+        webdavPassword: response.data.webdav_password || '',
+        webdavWatchFolders: response.data.webdav_watch_folders || ['/Documents'],
+        webdavFileExtensions: response.data.webdav_file_extensions || ['pdf', 'png', 'jpg', 'jpeg', 'tiff', 'bmp', 'txt'],
+        webdavAutoSync: response.data.webdav_auto_sync || false,
+        webdavSyncIntervalMinutes: response.data.webdav_sync_interval_minutes || 60,
       });
     } catch (error: any) {
       console.error('Error fetching settings:', error);
@@ -299,6 +727,7 @@ const SettingsPage: React.FC = () => {
       <Paper sx={{ width: '100%' }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
           <Tab label="General" />
+          <Tab label="WebDAV Integration" />
           <Tab label="User Management" />
         </Tabs>
 
@@ -573,6 +1002,15 @@ const SettingsPage: React.FC = () => {
           )}
 
           {tabValue === 1 && (
+            <WebDAVTabContent 
+              settings={settings}
+              loading={loading}
+              onSettingsChange={handleSettingsChange}
+              onShowSnackbar={showSnackbar}
+            />
+          )}
+
+          {tabValue === 2 && (
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6">
