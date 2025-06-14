@@ -4,6 +4,7 @@ use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::time::Duration;
+use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
 use crate::models::{
@@ -20,6 +21,27 @@ pub struct WebDAVConfig {
     pub file_extensions: Vec<String>,
     pub timeout_seconds: u64,
     pub server_type: Option<String>, // "nextcloud", "owncloud", "generic"
+}
+
+#[derive(Debug, Clone)]
+pub struct RetryConfig {
+    pub max_retries: u32,
+    pub initial_delay_ms: u64,
+    pub max_delay_ms: u64,
+    pub backoff_multiplier: f64,
+    pub timeout_seconds: u64,
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            initial_delay_ms: 1000, // 1 second
+            max_delay_ms: 30000,    // 30 seconds
+            backoff_multiplier: 2.0,
+            timeout_seconds: 120,   // 2 minutes total timeout
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -87,10 +109,15 @@ pub struct WebDAVService {
     client: Client,
     config: WebDAVConfig,
     base_webdav_url: String,
+    retry_config: RetryConfig,
 }
 
 impl WebDAVService {
     pub fn new(config: WebDAVConfig) -> Result<Self> {
+        Self::new_with_retry(config, RetryConfig::default())
+    }
+
+    pub fn new_with_retry(config: WebDAVConfig, retry_config: RetryConfig) -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds))
             .build()?;
@@ -112,7 +139,71 @@ impl WebDAVService {
             client,
             config,
             base_webdav_url,
+            retry_config,
         })
+    }
+
+    async fn retry_with_backoff<T, F, Fut>(&self, operation_name: &str, operation: F) -> Result<T>
+    where
+        F: Fn() -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let mut attempt = 0;
+        let mut delay = self.retry_config.initial_delay_ms;
+
+        loop {
+            match operation().await {
+                Ok(result) => {
+                    if attempt > 0 {
+                        info!("{} succeeded after {} retries", operation_name, attempt);
+                    }
+                    return Ok(result);
+                }
+                Err(err) => {
+                    attempt += 1;
+                    
+                    if attempt > self.retry_config.max_retries {
+                        error!("{} failed after {} attempts: {}", operation_name, attempt - 1, err);
+                        return Err(err);
+                    }
+
+                    // Check if error is retryable
+                    if !Self::is_retryable_error(&err) {
+                        error!("{} failed with non-retryable error: {}", operation_name, err);
+                        return Err(err);
+                    }
+
+                    warn!("{} failed (attempt {}), retrying in {}ms: {}", 
+                        operation_name, attempt, delay, err);
+                    
+                    sleep(Duration::from_millis(delay)).await;
+                    
+                    // Calculate next delay with exponential backoff
+                    delay = ((delay as f64 * self.retry_config.backoff_multiplier) as u64)
+                        .min(self.retry_config.max_delay_ms);
+                }
+            }
+        }
+    }
+
+    fn is_retryable_error(error: &anyhow::Error) -> bool {
+        // Check if error is network-related or temporary
+        if let Some(reqwest_error) = error.downcast_ref::<reqwest::Error>() {
+            // Retry on network errors, timeouts, and server errors (5xx)
+            return reqwest_error.is_timeout() 
+                || reqwest_error.is_connect() 
+                || reqwest_error.is_request()
+                || reqwest_error.status()
+                    .map(|s| s.is_server_error() || s == 429) // 429 = Too Many Requests
+                    .unwrap_or(true);
+        }
+        
+        // For other errors, check the error message for common temporary issues
+        let error_str = error.to_string().to_lowercase();
+        error_str.contains("timeout") 
+            || error_str.contains("connection") 
+            || error_str.contains("network")
+            || error_str.contains("temporary")
     }
 
     pub async fn test_connection(&self, test_config: WebDAVTestConnection) -> Result<WebDAVConnectionResult> {
@@ -304,7 +395,13 @@ impl WebDAVService {
         })
     }
 
-    async fn discover_files_in_folder(&self, folder_path: &str) -> Result<Vec<FileInfo>> {
+    pub async fn discover_files_in_folder(&self, folder_path: &str) -> Result<Vec<FileInfo>> {
+        self.retry_with_backoff("discover_files_in_folder", || {
+            self.discover_files_in_folder_impl(folder_path)
+        }).await
+    }
+
+    async fn discover_files_in_folder_impl(&self, folder_path: &str) -> Result<Vec<FileInfo>> {
         let folder_url = format!("{}{}", self.base_webdav_url, folder_path);
         
         debug!("Discovering files in: {}", folder_url);
@@ -413,6 +510,12 @@ impl WebDAVService {
     }
 
     pub async fn download_file(&self, file_path: &str) -> Result<Vec<u8>> {
+        self.retry_with_backoff("download_file", || {
+            self.download_file_impl(file_path)
+        }).await
+    }
+
+    async fn download_file_impl(&self, file_path: &str) -> Result<Vec<u8>> {
         let file_url = format!("{}{}", self.base_webdav_url, file_path);
         
         debug!("Downloading file: {}", file_url);

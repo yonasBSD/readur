@@ -11,6 +11,7 @@ pub mod routes;
 pub mod seed;
 pub mod watcher;
 pub mod webdav_service;
+pub mod webdav_scheduler;
 
 #[cfg(test)]
 mod tests;

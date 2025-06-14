@@ -22,6 +22,8 @@ mod routes;
 mod seed;
 mod swagger;
 mod watcher;
+mod webdav_service;
+mod webdav_scheduler;
 
 #[cfg(test)]
 mod tests;
@@ -137,12 +139,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     seed::seed_system_user(&db).await?;
     
     let state = AppState { db, config: config.clone() };
+    let state = Arc::new(state);
     
     let app = Router::new()
         .route("/api/health", get(readur::health_check))
         .nest("/api/auth", routes::auth::router())
         .nest("/api/documents", routes::documents::router())
         .nest("/api/metrics", routes::metrics::router())
+        .nest("/api/notifications", routes::notifications::router())
         .nest("/api/queue", routes::queue::router())
         .nest("/api/search", routes::search::router())
         .nest("/api/settings", routes::settings::router())
@@ -152,7 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest_service("/", ServeDir::new("/app/frontend").fallback(ServeFile::new("/app/frontend/index.html")))
         .fallback(serve_spa)
         .layer(CorsLayer::permissive())
-        .with_state(Arc::new(state));
+        .with_state(state.clone());
     
     let watcher_config = config.clone();
     tokio::spawn(async move {
@@ -191,6 +195,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 error!("Error cleaning up completed items: {}", e);
             }
         }
+    });
+    
+    // Start WebDAV background sync scheduler
+    let webdav_scheduler = webdav_scheduler::WebDAVScheduler::new(state.clone());
+    tokio::spawn(async move {
+        info!("Starting WebDAV background sync scheduler");
+        webdav_scheduler.start().await;
     });
     
     let listener = tokio::net::TcpListener::bind(&config.server_address).await?;

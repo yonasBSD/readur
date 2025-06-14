@@ -1267,6 +1267,70 @@ impl Database {
         }
     }
 
+    pub async fn get_all_user_settings(&self) -> Result<Vec<crate::models::Settings>> {
+        let rows = sqlx::query(
+            r#"SELECT id, user_id, ocr_language, concurrent_ocr_jobs, ocr_timeout_seconds,
+               max_file_size_mb, allowed_file_types, auto_rotate_images, enable_image_preprocessing,
+               search_results_per_page, search_snippet_length, fuzzy_search_threshold,
+               retention_days, enable_auto_cleanup, enable_compression, memory_limit_mb,
+               cpu_priority, enable_background_ocr, ocr_page_segmentation_mode, ocr_engine_mode,
+               ocr_min_confidence, ocr_dpi, ocr_enhance_contrast, ocr_remove_noise,
+               ocr_detect_orientation, ocr_whitelist_chars, ocr_blacklist_chars,
+               webdav_enabled, webdav_server_url, webdav_username, webdav_password,
+               webdav_watch_folders, webdav_file_extensions, webdav_auto_sync, webdav_sync_interval_minutes,
+               created_at, updated_at
+               FROM settings
+               WHERE webdav_enabled = true AND webdav_auto_sync = true"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut settings_list = Vec::new();
+        for row in rows {
+            settings_list.push(crate::models::Settings {
+                id: row.get("id"),
+                user_id: row.get("user_id"),
+                ocr_language: row.get("ocr_language"),
+                concurrent_ocr_jobs: row.get("concurrent_ocr_jobs"),
+                ocr_timeout_seconds: row.get("ocr_timeout_seconds"),
+                max_file_size_mb: row.get("max_file_size_mb"),
+                allowed_file_types: row.get("allowed_file_types"),
+                auto_rotate_images: row.get("auto_rotate_images"),
+                enable_image_preprocessing: row.get("enable_image_preprocessing"),
+                search_results_per_page: row.get("search_results_per_page"),
+                search_snippet_length: row.get("search_snippet_length"),
+                fuzzy_search_threshold: row.get("fuzzy_search_threshold"),
+                retention_days: row.get("retention_days"),
+                enable_auto_cleanup: row.get("enable_auto_cleanup"),
+                enable_compression: row.get("enable_compression"),
+                memory_limit_mb: row.get("memory_limit_mb"),
+                cpu_priority: row.get("cpu_priority"),
+                enable_background_ocr: row.get("enable_background_ocr"),
+                ocr_page_segmentation_mode: row.get("ocr_page_segmentation_mode"),
+                ocr_engine_mode: row.get("ocr_engine_mode"),
+                ocr_min_confidence: row.get("ocr_min_confidence"),
+                ocr_dpi: row.get("ocr_dpi"),
+                ocr_enhance_contrast: row.get("ocr_enhance_contrast"),
+                ocr_remove_noise: row.get("ocr_remove_noise"),
+                ocr_detect_orientation: row.get("ocr_detect_orientation"),
+                ocr_whitelist_chars: row.get("ocr_whitelist_chars"),
+                ocr_blacklist_chars: row.get("ocr_blacklist_chars"),
+                webdav_enabled: row.get("webdav_enabled"),
+                webdav_server_url: row.get("webdav_server_url"),
+                webdav_username: row.get("webdav_username"),
+                webdav_password: row.get("webdav_password"),
+                webdav_watch_folders: row.get("webdav_watch_folders"),
+                webdav_file_extensions: row.get("webdav_file_extensions"),
+                webdav_auto_sync: row.get("webdav_auto_sync"),
+                webdav_sync_interval_minutes: row.get("webdav_sync_interval_minutes"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+            });
+        }
+
+        Ok(settings_list)
+    }
+
     pub async fn create_or_update_settings(&self, user_id: Uuid, settings: &crate::models::UpdateSettings) -> Result<crate::models::Settings> {
         // Get existing settings to merge with updates
         let existing = self.get_user_settings(user_id).await?;
@@ -1415,6 +1479,115 @@ impl Database {
             webdav_sync_interval_minutes: row.get("webdav_sync_interval_minutes"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
+        })
+    }
+
+    // Notification methods
+    pub async fn create_notification(&self, user_id: Uuid, notification: &crate::models::CreateNotification) -> Result<crate::models::Notification> {
+        let row = sqlx::query(
+            r#"INSERT INTO notifications (user_id, notification_type, title, message, action_url, metadata)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               RETURNING id, user_id, notification_type, title, message, read, action_url, metadata, created_at"#
+        )
+        .bind(user_id)
+        .bind(&notification.notification_type)
+        .bind(&notification.title)
+        .bind(&notification.message)
+        .bind(&notification.action_url)
+        .bind(&notification.metadata)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(crate::models::Notification {
+            id: row.get("id"),
+            user_id: row.get("user_id"),
+            notification_type: row.get("notification_type"),
+            title: row.get("title"),
+            message: row.get("message"),
+            read: row.get("read"),
+            action_url: row.get("action_url"),
+            metadata: row.get("metadata"),
+            created_at: row.get("created_at"),
+        })
+    }
+
+    pub async fn get_user_notifications(&self, user_id: Uuid, limit: i64, offset: i64) -> Result<Vec<crate::models::Notification>> {
+        let rows = sqlx::query(
+            r#"SELECT id, user_id, notification_type, title, message, read, action_url, metadata, created_at
+               FROM notifications 
+               WHERE user_id = $1 
+               ORDER BY created_at DESC 
+               LIMIT $2 OFFSET $3"#
+        )
+        .bind(user_id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut notifications = Vec::new();
+        for row in rows {
+            notifications.push(crate::models::Notification {
+                id: row.get("id"),
+                user_id: row.get("user_id"),
+                notification_type: row.get("notification_type"),
+                title: row.get("title"),
+                message: row.get("message"),
+                read: row.get("read"),
+                action_url: row.get("action_url"),
+                metadata: row.get("metadata"),
+                created_at: row.get("created_at"),
+            });
+        }
+
+        Ok(notifications)
+    }
+
+    pub async fn get_unread_notification_count(&self, user_id: Uuid) -> Result<i64> {
+        let row = sqlx::query("SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND read = false")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(row.get("count"))
+    }
+
+    pub async fn mark_notification_read(&self, user_id: Uuid, notification_id: Uuid) -> Result<()> {
+        sqlx::query("UPDATE notifications SET read = true WHERE id = $1 AND user_id = $2")
+            .bind(notification_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn mark_all_notifications_read(&self, user_id: Uuid) -> Result<()> {
+        sqlx::query("UPDATE notifications SET read = true WHERE user_id = $1 AND read = false")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_notification(&self, user_id: Uuid, notification_id: Uuid) -> Result<()> {
+        sqlx::query("DELETE FROM notifications WHERE id = $1 AND user_id = $2")
+            .bind(notification_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_notification_summary(&self, user_id: Uuid) -> Result<crate::models::NotificationSummary> {
+        let unread_count = self.get_unread_notification_count(user_id).await?;
+        let recent_notifications = self.get_user_notifications(user_id, 5, 0).await?;
+
+        Ok(crate::models::NotificationSummary {
+            unread_count,
+            recent_notifications,
         })
     }
 }

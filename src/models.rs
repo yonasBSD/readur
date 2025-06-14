@@ -527,3 +527,31 @@ pub struct WebDAVSyncStatus {
     pub current_folder: Option<String>,
     pub errors: Vec<String>,
 }
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct Notification {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub notification_type: String,
+    pub title: String,
+    pub message: String,
+    pub read: bool,
+    pub action_url: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateNotification {
+    pub notification_type: String,
+    pub title: String,
+    pub message: String,
+    pub action_url: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct NotificationSummary {
+    pub unread_count: i64,
+    pub recent_notifications: Vec<Notification>,
+}
