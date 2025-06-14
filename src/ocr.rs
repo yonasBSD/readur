@@ -1,14 +1,20 @@
 use anyhow::{anyhow, Result};
 use std::path::Path;
+use crate::ocr_error::OcrError;
+use crate::ocr_health::OcrHealthChecker;
 
 #[cfg(feature = "ocr")]
 use tesseract::Tesseract;
 
-pub struct OcrService;
+pub struct OcrService {
+    health_checker: OcrHealthChecker,
+}
 
 impl OcrService {
     pub fn new() -> Self {
-        Self
+        Self {
+            health_checker: OcrHealthChecker::new(),
+        }
     }
 
     pub async fn extract_text_from_image(&self, file_path: &str) -> Result<String> {
@@ -18,17 +24,29 @@ impl OcrService {
     pub async fn extract_text_from_image_with_lang(&self, file_path: &str, lang: &str) -> Result<String> {
         #[cfg(feature = "ocr")]
         {
-            let mut tesseract = Tesseract::new(None, Some(lang))?
+            // Perform health checks first
+            self.health_checker.check_tesseract_installation()
+                .map_err(|e| anyhow!(e))?;
+            self.health_checker.check_language_data(lang)
+                .map_err(|e| anyhow!(e))?;
+            
+            let mut tesseract = Tesseract::new(None, Some(lang))
+                .map_err(|e| anyhow!(OcrError::InitializationFailed { 
+                    details: e.to_string() 
+                }))?
                 .set_image(file_path)?;
             
-            let text = tesseract.get_text()?;
+            let text = tesseract.get_text()
+                .map_err(|e| anyhow!(OcrError::InitializationFailed { 
+                    details: format!("Failed to extract text: {}", e) 
+                }))?;
             
             Ok(text.trim().to_string())
         }
         
         #[cfg(not(feature = "ocr"))]
         {
-            Err(anyhow!("OCR feature is disabled. Recompile with --features ocr"))
+            Err(anyhow!(OcrError::TesseractNotInstalled))
         }
     }
 
@@ -44,7 +62,7 @@ impl OcrService {
         
         #[cfg(not(feature = "ocr"))]
         {
-            Err(anyhow!("OCR feature is disabled. Recompile with --features ocr"))
+            Err(anyhow!(OcrError::TesseractNotInstalled))
         }
     }
 
@@ -66,7 +84,9 @@ impl OcrService {
                 if self.is_image_file(file_path) {
                     self.extract_text_from_image_with_lang(file_path, lang).await
                 } else {
-                    Err(anyhow!("Unsupported file type for OCR: {}", mime_type))
+                    Err(anyhow!(OcrError::InvalidImageFormat { 
+                        details: format!("Unsupported MIME type: {}", mime_type) 
+                    }))
                 }
             }
         }

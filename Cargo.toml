@@ -36,6 +36,9 @@ tesseract = { version = "0.15", optional = true }
 pdf-extract = { version = "0.7", optional = true }
 image = { version = "0.24", features = ["png", "jpeg", "tiff", "bmp"], optional = true }
 imageproc = { version = "0.23", optional = true }
+thiserror = "1.0"
+sysinfo = "0.30"
+raw-cpuid = { version = "11", optional = true }
 reqwest = { version = "0.11", features = ["json", "multipart"] }
 quick-xml = { version = "0.31", features = ["serialize"] }
 urlencoding = "2.1"
@@ -48,7 +51,7 @@ utoipa-swagger-ui = { version = "6", features = ["axum"] }
 
 [features]
 default = ["ocr"]
-ocr = ["tesseract", "pdf-extract", "image", "imageproc"]
+ocr = ["tesseract", "pdf-extract", "image", "imageproc", "raw-cpuid"]
 
 [dev-dependencies]
 tempfile = "3"
