@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -128,6 +128,29 @@ interface WebDAVTabContentProps {
   onShowSnackbar: (message: string, severity: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
+// Debounce utility function
+function useDebounce<T extends (...args: any[]) => any>(func: T, delay: number): T {
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const debouncedFunc = useCallback((...args: Parameters<T>) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => func(...args), delay);
+  }, [func, delay]) as T;
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return debouncedFunc;
+}
+
 const WebDAVTabContent: React.FC<WebDAVTabContentProps> = ({ 
   settings, 
   loading, 
@@ -139,9 +162,65 @@ const WebDAVTabContent: React.FC<WebDAVTabContentProps> = ({
   const [crawlEstimate, setCrawlEstimate] = useState<WebDAVCrawlEstimate | null>(null);
   const [estimatingCrawl, setEstimatingCrawl] = useState(false);
   const [newFolder, setNewFolder] = useState('');
+  
+  // Local state for input fields to prevent focus loss
+  const [localWebdavServerUrl, setLocalWebdavServerUrl] = useState(settings.webdavServerUrl);
+  const [localWebdavUsername, setLocalWebdavUsername] = useState(settings.webdavUsername);
+  const [localWebdavPassword, setLocalWebdavPassword] = useState(settings.webdavPassword);
+  const [localSyncInterval, setLocalSyncInterval] = useState(settings.webdavSyncIntervalMinutes);
+
+  // Update local state when settings change from outside (like initial load)
+  useEffect(() => {
+    setLocalWebdavServerUrl(settings.webdavServerUrl);
+    setLocalWebdavUsername(settings.webdavUsername);
+    setLocalWebdavPassword(settings.webdavPassword);
+    setLocalSyncInterval(settings.webdavSyncIntervalMinutes);
+  }, [settings.webdavServerUrl, settings.webdavUsername, settings.webdavPassword, settings.webdavSyncIntervalMinutes]);
+
+  // Debounced update functions
+  const debouncedUpdateServerUrl = useDebounce((value: string) => {
+    onSettingsChange('webdavServerUrl', value);
+  }, 500);
+
+  const debouncedUpdateUsername = useDebounce((value: string) => {
+    onSettingsChange('webdavUsername', value);
+  }, 500);
+
+  const debouncedUpdatePassword = useDebounce((value: string) => {
+    onSettingsChange('webdavPassword', value);
+  }, 500);
+
+  const debouncedUpdateSyncInterval = useDebounce((value: number) => {
+    onSettingsChange('webdavSyncIntervalMinutes', value);
+  }, 500);
+
+  // Input change handlers
+  const handleServerUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocalWebdavServerUrl(value);
+    debouncedUpdateServerUrl(value);
+  };
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocalWebdavUsername(value);
+    debouncedUpdateUsername(value);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocalWebdavPassword(value);
+    debouncedUpdatePassword(value);
+  };
+
+  const handleSyncIntervalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value);
+    setLocalSyncInterval(value);
+    debouncedUpdateSyncInterval(value);
+  };
 
   const testConnection = async () => {
-    if (!settings.webdavServerUrl || !settings.webdavUsername || !settings.webdavPassword) {
+    if (!localWebdavServerUrl || !localWebdavUsername || !localWebdavPassword) {
       onShowSnackbar('Please fill in all WebDAV connection details', 'warning');
       return;
     }
@@ -149,9 +228,9 @@ const WebDAVTabContent: React.FC<WebDAVTabContentProps> = ({
     setTestingConnection(true);
     try {
       const response = await api.post('/webdav/test-connection', {
-        server_url: settings.webdavServerUrl,
-        username: settings.webdavUsername,
-        password: settings.webdavPassword,
+        server_url: localWebdavServerUrl,
+        username: localWebdavUsername,
+        password: localWebdavPassword,
         server_type: 'nextcloud'
       });
       setConnectionResult(response.data);
@@ -249,8 +328,8 @@ const WebDAVTabContent: React.FC<WebDAVTabContentProps> = ({
                   <TextField
                     fullWidth
                     label="Server URL"
-                    value={settings.webdavServerUrl}
-                    onChange={(e) => onSettingsChange('webdavServerUrl', e.target.value)}
+                    value={localWebdavServerUrl}
+                    onChange={handleServerUrlChange}
                     disabled={loading}
                     placeholder="https://cloud.example.com"
                     helperText="Full URL to your WebDAV server"
@@ -276,8 +355,8 @@ const WebDAVTabContent: React.FC<WebDAVTabContentProps> = ({
                   <TextField
                     fullWidth
                     label="Username"
-                    value={settings.webdavUsername}
-                    onChange={(e) => onSettingsChange('webdavUsername', e.target.value)}
+                    value={localWebdavUsername}
+                    onChange={handleUsernameChange}
                     disabled={loading}
                   />
                 </Grid>
@@ -286,8 +365,8 @@ const WebDAVTabContent: React.FC<WebDAVTabContentProps> = ({
                     fullWidth
                     label="Password / App Password"
                     type="password"
-                    value={settings.webdavPassword}
-                    onChange={(e) => onSettingsChange('webdavPassword', e.target.value)}
+                    value={localWebdavPassword}
+                    onChange={handlePasswordChange}
                     disabled={loading}
                     helperText="For Nextcloud/ownCloud, use an app password"
                   />
@@ -364,8 +443,8 @@ const WebDAVTabContent: React.FC<WebDAVTabContentProps> = ({
                   fullWidth
                   type="number"
                   label="Sync Interval (minutes)"
-                  value={settings.webdavSyncIntervalMinutes}
-                  onChange={(e) => onSettingsChange('webdavSyncIntervalMinutes', parseInt(e.target.value))}
+                  value={localSyncInterval}
+                  onChange={handleSyncIntervalChange}
                   disabled={loading}
                   inputProps={{ min: 15, max: 1440 }}
                   helperText="How often to check for new files"
@@ -618,7 +697,6 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleSettingsChange = async (key: keyof Settings, value: any): Promise<void> => {
-    setLoading(true);
     try {
       // Convert camelCase to snake_case for API
       const snakeCase = (str: string): string => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
@@ -628,13 +706,17 @@ const SettingsPage: React.FC = () => {
       const updatePayload = { [apiKey]: value };
       
       await api.put('/settings', updatePayload);
-      setSettings({ ...settings, [key]: value });
-      showSnackbar('Settings updated successfully', 'success');
+      
+      // Only update state after successful API call
+      setSettings(prevSettings => ({ ...prevSettings, [key]: value }));
+      
+      // Only show success message for non-text inputs to reduce noise
+      if (typeof value !== 'string') {
+        showSnackbar('Settings updated successfully', 'success');
+      }
     } catch (error) {
       console.error('Error updating settings:', error);
       showSnackbar('Failed to update settings', 'error');
-    } finally {
-      setLoading(false);
     }
   };
 
