@@ -1,16 +1,16 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use reqwest::{Client, Method};
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
 use crate::models::{
-    WebDAVConnectionResult, WebDAVCrawlEstimate, WebDAVFolderInfo,
-    WebDAVSyncStatus, WebDAVTestConnection,
+    FileInfo, WebDAVConnectionResult, WebDAVCrawlEstimate, WebDAVFolderInfo,
+    WebDAVTestConnection,
 };
+use crate::webdav_xml_parser::parse_propfind_response;
 
 #[derive(Debug, Clone)]
 pub struct WebDAVConfig {
@@ -44,66 +44,7 @@ impl Default for RetryConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct WebDAVResponse {
-    #[serde(rename = "d:multistatus")]
-    multistatus: MultiStatus,
-}
 
-#[derive(Debug, Serialize, Deserialize)]
-struct MultiStatus {
-    #[serde(rename = "d:response")]
-    responses: Vec<DAVResponse>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct DAVResponse {
-    #[serde(rename = "d:href")]
-    href: String,
-    #[serde(rename = "d:propstat")]
-    propstat: PropStat,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct PropStat {
-    #[serde(rename = "d:prop")]
-    prop: DAVProperties,
-    #[serde(rename = "d:status")]
-    status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct DAVProperties {
-    #[serde(rename = "d:displayname")]
-    displayname: Option<String>,
-    #[serde(rename = "d:getcontentlength")]
-    contentlength: Option<String>,
-    #[serde(rename = "d:getlastmodified")]
-    lastmodified: Option<String>,
-    #[serde(rename = "d:getcontenttype")]
-    contenttype: Option<String>,
-    #[serde(rename = "d:getetag")]
-    etag: Option<String>,
-    #[serde(rename = "d:resourcetype")]
-    resourcetype: Option<ResourceType>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ResourceType {
-    #[serde(rename = "d:collection")]
-    collection: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone)]
-pub struct FileInfo {
-    pub path: String,
-    pub name: String,
-    pub size: i64,
-    pub mime_type: String,
-    pub last_modified: Option<DateTime<Utc>>,
-    pub etag: String,
-    pub is_directory: bool,
-}
 
 pub struct WebDAVService {
     client: Client,
@@ -438,75 +379,7 @@ impl WebDAVService {
     }
 
     pub fn parse_webdav_response(&self, xml_text: &str) -> Result<Vec<FileInfo>> {
-        // For now, we'll do simple string parsing
-        // In a production system, you'd want to use a proper XML parser like quick-xml
-        let mut files = Vec::new();
-        
-        // This is a simplified parser - in practice you'd want proper XML parsing
-        let lines: Vec<&str> = xml_text.lines().collect();
-        let mut current_file: Option<FileInfo> = None;
-        let mut in_response = false;
-        
-        for line in lines {
-            let line = line.trim();
-            
-            if line.contains("<d:response>") {
-                in_response = true;
-                current_file = Some(FileInfo {
-                    path: String::new(),
-                    name: String::new(),
-                    size: 0,
-                    mime_type: String::new(),
-                    last_modified: None,
-                    etag: String::new(),
-                    is_directory: false,
-                });
-            } else if line.contains("</d:response>") && in_response {
-                if let Some(file) = current_file.take() {
-                    if !file.path.is_empty() && !file.path.ends_with('/') {
-                        files.push(file);
-                    }
-                }
-                in_response = false;
-            } else if in_response {
-                if let Some(ref mut file) = current_file {
-                    if line.contains("<d:href>") {
-                        if let Some(start) = line.find("<d:href>") {
-                            if let Some(end) = line.find("</d:href>") {
-                                let href = &line[start + 8..end];
-                                file.path = href.to_string();
-                                file.name = href.split('/').last().unwrap_or("").to_string();
-                            }
-                        }
-                    } else if line.contains("<d:getcontentlength>") {
-                        if let Some(start) = line.find("<d:getcontentlength>") {
-                            if let Some(end) = line.find("</d:getcontentlength>") {
-                                if let Ok(size) = line[start + 20..end].parse::<i64>() {
-                                    file.size = size;
-                                }
-                            }
-                        }
-                    } else if line.contains("<d:getcontenttype>") {
-                        if let Some(start) = line.find("<d:getcontenttype>") {
-                            if let Some(end) = line.find("</d:getcontenttype>") {
-                                file.mime_type = line[start + 18..end].to_string();
-                            }
-                        }
-                    } else if line.contains("<d:getetag>") {
-                        if let Some(start) = line.find("<d:getetag>") {
-                            if let Some(end) = line.find("</d:getetag>") {
-                                file.etag = line[start + 11..end].to_string();
-                            }
-                        }
-                    } else if line.contains("<d:collection") {
-                        file.is_directory = true;
-                    }
-                }
-            }
-        }
-
-        info!("Parsed {} files from WebDAV response", files.len());
-        Ok(files)
+        parse_propfind_response(xml_text)
     }
 
     pub async fn download_file(&self, file_path: &str) -> Result<Vec<u8>> {

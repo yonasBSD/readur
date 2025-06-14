@@ -24,6 +24,7 @@ mod swagger;
 mod watcher;
 mod webdav_service;
 mod webdav_scheduler;
+mod webdav_xml_parser;
 
 #[cfg(test)]
 mod tests;

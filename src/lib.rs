@@ -12,6 +12,7 @@ pub mod seed;
 pub mod watcher;
 pub mod webdav_service;
 pub mod webdav_scheduler;
+pub mod webdav_xml_parser;
 
 #[cfg(test)]
 mod tests;

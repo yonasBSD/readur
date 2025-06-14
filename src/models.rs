@@ -610,3 +610,14 @@ pub struct CreateWebDAVFile {
     pub sync_status: String,
     pub sync_error: Option<String>,
 }
+
+#[derive(Debug, Clone)]
+pub struct FileInfo {
+    pub path: String,
+    pub name: String,
+    pub size: i64,
+    pub mime_type: String,
+    pub last_modified: Option<DateTime<Utc>>,
+    pub etag: String,
+    pub is_directory: bool,
+}
