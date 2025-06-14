@@ -555,3 +555,58 @@ pub struct NotificationSummary {
     pub unread_count: i64,
     pub recent_notifications: Vec<Notification>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WebDAVSyncState {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub last_sync_at: Option<DateTime<Utc>>,
+    pub sync_cursor: Option<String>,
+    pub is_running: bool,
+    pub files_processed: i64,
+    pub files_remaining: i64,
+    pub current_folder: Option<String>,
+    pub errors: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateWebDAVSyncState {
+    pub last_sync_at: Option<DateTime<Utc>>,
+    pub sync_cursor: Option<String>,
+    pub is_running: bool,
+    pub files_processed: i64,
+    pub files_remaining: i64,
+    pub current_folder: Option<String>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WebDAVFile {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub webdav_path: String,
+    pub etag: String,
+    pub last_modified: Option<DateTime<Utc>>,
+    pub file_size: i64,
+    pub mime_type: String,
+    pub document_id: Option<Uuid>,
+    pub sync_status: String,
+    pub sync_error: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateWebDAVFile {
+    pub user_id: Uuid,
+    pub webdav_path: String,
+    pub etag: String,
+    pub last_modified: Option<DateTime<Utc>>,
+    pub file_size: i64,
+    pub mime_type: String,
+    pub document_id: Option<Uuid>,
+    pub sync_status: String,
+    pub sync_error: Option<String>,
+}

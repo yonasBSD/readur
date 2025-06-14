@@ -536,16 +536,4 @@ impl WebDAVService {
         Ok(bytes.to_vec())
     }
 
-    pub async fn get_sync_status(&self) -> Result<WebDAVSyncStatus> {
-        // This would typically read from database/cache
-        // For now, return a placeholder
-        Ok(WebDAVSyncStatus {
-            is_running: false,
-            last_sync: None,
-            files_processed: 0,
-            files_remaining: 0,
-            current_folder: None,
-            errors: Vec::new(),
-        })
-    }
 }

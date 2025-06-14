@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::path::Path;
 
 use axum::{
     extract::State,
@@ -16,12 +15,13 @@ use crate::{
         WebDAVConnectionResult, WebDAVCrawlEstimate, WebDAVSyncStatus,
         WebDAVTestConnection,
     },
-    ocr_queue::OcrQueueService,
-    file_service::FileService,
     AppState,
 };
 use crate::webdav_service::WebDAVConfig;
 use crate::webdav_service::WebDAVService;
+
+pub mod webdav_sync;
+use webdav_sync::perform_webdav_sync_with_tracking;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -246,18 +246,41 @@ async fn get_webdav_sync_status(
         }
     };
 
-    // For now, return basic status - in production you'd query the webdav_sync_state table
-    // TODO: Read actual sync state from database
-    let status = WebDAVSyncStatus {
-        is_running: false,
-        last_sync: None,
-        files_processed: 0,
-        files_remaining: 0,
-        current_folder: None,
-        errors: Vec::new(),
-    };
-
-    Ok(Json(status))
+    // Get sync state from database
+    match state.db.get_webdav_sync_state(auth_user.user.id).await {
+        Ok(Some(sync_state)) => {
+            Ok(Json(WebDAVSyncStatus {
+                is_running: sync_state.is_running,
+                last_sync: sync_state.last_sync_at,
+                files_processed: sync_state.files_processed,
+                files_remaining: sync_state.files_remaining,
+                current_folder: sync_state.current_folder,
+                errors: sync_state.errors,
+            }))
+        }
+        Ok(None) => {
+            // No sync state yet
+            Ok(Json(WebDAVSyncStatus {
+                is_running: false,
+                last_sync: None,
+                files_processed: 0,
+                files_remaining: 0,
+                current_folder: None,
+                errors: Vec::new(),
+            }))
+        }
+        Err(e) => {
+            error!("Failed to get WebDAV sync state: {}", e);
+            Ok(Json(WebDAVSyncStatus {
+                is_running: false,
+                last_sync: None,
+                files_processed: 0,
+                files_remaining: 0,
+                current_folder: None,
+                errors: vec![format!("Error retrieving sync state: {}", e)],
+            }))
+        }
+    }
 }
 
 #[utoipa::path(
@@ -303,7 +326,7 @@ async fn start_webdav_sync(
     let enable_background_ocr = user_settings.enable_background_ocr;
     
     tokio::spawn(async move {
-        match perform_webdav_sync(state_clone.clone(), user_id, webdav_service, webdav_config, enable_background_ocr).await {
+        match perform_webdav_sync_with_tracking(state_clone.clone(), user_id, webdav_service, webdav_config, enable_background_ocr).await {
             Ok(files_processed) => {
                 info!("WebDAV sync completed successfully for user {}: {} files processed", user_id, files_processed);
                 
@@ -355,123 +378,3 @@ async fn start_webdav_sync(
     })))
 }
 
-async fn perform_webdav_sync(
-    state: Arc<AppState>,
-    user_id: uuid::Uuid,
-    webdav_service: WebDAVService,
-    config: WebDAVConfig,
-    enable_background_ocr: bool,
-) -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
-    info!("Performing WebDAV sync for user {} on {} folders", user_id, config.watch_folders.len());
-    
-    let mut files_processed = 0;
-    
-    // Process each watch folder
-    for folder_path in &config.watch_folders {
-        info!("Syncing folder: {}", folder_path);
-        
-        // Discover files in the folder
-        match webdav_service.discover_files_in_folder(folder_path).await {
-            Ok(files) => {
-                info!("Found {} files in folder {}", files.len(), folder_path);
-                
-                for file_info in files {
-                    if file_info.is_directory {
-                        continue; // Skip directories
-                    }
-                    
-                    // Check if file extension is supported
-                    let file_extension = Path::new(&file_info.name)
-                        .extension()
-                        .and_then(|ext| ext.to_str())
-                        .unwrap_or("")
-                        .to_lowercase();
-                    
-                    if !config.file_extensions.contains(&file_extension) {
-                        continue; // Skip unsupported file types
-                    }
-                    
-                    // Check if we've already processed this file
-                    // TODO: Check webdav_files table for existing files with same etag
-                    
-                    // Download the file
-                    match webdav_service.download_file(&file_info.path).await {
-                        Ok(file_data) => {
-                            info!("Downloaded file: {} ({} bytes)", file_info.name, file_data.len());
-                            
-                            // Create file service and save file to disk first
-                            let file_service = FileService::new(state.config.upload_path.clone());
-                            
-                            let saved_file_path = match file_service.save_file(&file_info.name, &file_data).await {
-                                Ok(path) => path,
-                                Err(e) => {
-                                    error!("Failed to save file {}: {}", file_info.name, e);
-                                    continue;
-                                }
-                            };
-                            
-                            // Create document record
-                            let document = file_service.create_document(
-                                &file_info.name,
-                                &file_info.name, // original filename same as name
-                                &saved_file_path,
-                                file_info.size,
-                                &file_info.mime_type,
-                                user_id,
-                            );
-                            
-                            // Save document to database
-                            match state.db.create_document(document).await {
-                                Ok(saved_document) => {
-                                    info!("Created document record: {} (ID: {})", file_info.name, saved_document.id);
-                                    
-                                    // Add to OCR queue if enabled
-                                    if enable_background_ocr {
-                                        match sqlx::PgPool::connect(&state.config.database_url).await {
-                                            Ok(pool) => {
-                                                let queue_service = OcrQueueService::new(state.db.clone(), pool, 1);
-                                                
-                                                // Calculate priority based on file size
-                                                let priority = match file_info.size {
-                                                    0..=1048576 => 10,          // <= 1MB: highest priority
-                                                    ..=5242880 => 8,            // 1-5MB: high priority
-                                                    ..=10485760 => 6,           // 5-10MB: medium priority  
-                                                    ..=52428800 => 4,           // 10-50MB: low priority
-                                                    _ => 2,                     // > 50MB: lowest priority
-                                                };
-                                                
-                                                if let Err(e) = queue_service.enqueue_document(saved_document.id, priority, file_info.size).await {
-                                                    error!("Failed to enqueue document for OCR: {}", e);
-                                                } else {
-                                                    info!("Enqueued document {} for OCR processing", saved_document.id);
-                                                }
-                                            }
-                                            Err(e) => {
-                                                error!("Failed to connect to database for OCR queueing: {}", e);
-                                            }
-                                        }
-                                    }
-                                    
-                                    // TODO: Record in webdav_files table for tracking
-                                    files_processed += 1;
-                                }
-                                Err(e) => {
-                                    error!("Failed to create document record for {}: {}", file_info.name, e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            error!("Failed to download file {}: {}", file_info.path, e);
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                error!("Failed to discover files in folder {}: {}", folder_path, e);
-            }
-        }
-    }
-    
-    info!("WebDAV sync completed for user {}: {} files processed", user_id, files_processed);
-    Ok(files_processed)
-}
