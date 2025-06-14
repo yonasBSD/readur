@@ -1,4 +1,5 @@
-use readur::webdav_service::{WebDAVService, WebDAVConfig, FileInfo, RetryConfig};
+use readur::webdav_service::{WebDAVService, WebDAVConfig, RetryConfig};
+use readur::models::FileInfo;
 use readur::models::*;
 use tokio;
 use chrono::{DateTime, Utc};
