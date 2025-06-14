@@ -39,6 +39,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
+import TestNotification from '../TestNotification';
 
 interface Document {
   id: string;
@@ -562,6 +563,9 @@ const Dashboard: React.FC = () => {
           Here's what's happening with your documents today.
         </Typography>
       </Box>
+
+      {/* Test Notifications */}
+      <TestNotification />
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

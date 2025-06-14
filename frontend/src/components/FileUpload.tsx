@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { DocumentArrowUpIcon } from '@heroicons/react/24/outline'
 import { Document, documentService } from '../services/api'
+import { useNotifications } from '../contexts/NotificationContext'
 
 interface FileUploadProps {
   onUploadSuccess: (document: Document) => void
@@ -10,6 +11,7 @@ interface FileUploadProps {
 function FileUpload({ onUploadSuccess }: FileUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { addBatchNotification } = useNotifications()
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -21,12 +23,18 @@ function FileUpload({ onUploadSuccess }: FileUploadProps) {
     try {
       const response = await documentService.upload(file)
       onUploadSuccess(response.data)
+      
+      // Trigger success notification
+      addBatchNotification('success', 'upload', [{ name: file.name, success: true }])
     } catch (err: any) {
       setError(err.response?.data?.message || 'Upload failed')
+      
+      // Trigger error notification
+      addBatchNotification('error', 'upload', [{ name: file.name, success: false }])
     } finally {
       setUploading(false)
     }
-  }, [onUploadSuccess])
+  }, [onUploadSuccess, addBatchNotification])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useDropzone, FileRejection, DropzoneOptions } from 'react-dropzone';
 import api from '../../services/api';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 interface UploadedDocument {
   id: string;
@@ -54,6 +55,7 @@ type FileStatus = 'pending' | 'uploading' | 'success' | 'error';
 
 const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
   const theme = useTheme();
+  const { addBatchNotification } = useNotifications();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -155,11 +157,31 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
     setError('');
 
     const pendingFiles = files.filter(f => f.status === 'pending' || f.status === 'error');
+    const results: { name: string; success: boolean }[] = [];
     
     try {
-      await Promise.all(pendingFiles.map(uploadFile));
+      await Promise.allSettled(pendingFiles.map(async (file) => {
+        try {
+          await uploadFile(file);
+          results.push({ name: file.file.name, success: true });
+        } catch (error) {
+          results.push({ name: file.file.name, success: false });
+        }
+      }));
+      
+      // Trigger notification based on results
+      const hasFailures = results.some(r => !r.success);
+      const hasSuccesses = results.some(r => r.success);
+      
+      if (!hasFailures) {
+        addBatchNotification('success', 'upload', results);
+      } else if (!hasSuccesses) {
+        addBatchNotification('error', 'upload', results);
+      } else {
+        addBatchNotification('warning', 'upload', results);
+      }
     } catch (error) {
-      setError('Some uploads failed. Please try again.');
+      setError('Upload failed. Please try again.');
     } finally {
       setUploading(false);
     }

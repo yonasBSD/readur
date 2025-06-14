@@ -34,8 +34,10 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import GlobalSearchBar from '../GlobalSearchBar';
 import ThemeToggle from '../ThemeToggle/ThemeToggle';
+import NotificationPanel from '../Notifications/NotificationPanel';
 
 const drawerWidth = 280;
 
@@ -67,9 +69,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
 
   const handleDrawerToggle = (): void => {
     setMobileOpen(!mobileOpen);
@@ -87,6 +91,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     logout();
     handleProfileMenuClose();
     navigate('/login');
+  };
+
+  const handleNotificationClick = (event: React.MouseEvent<HTMLElement>): void => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+
+  const handleNotificationClose = (): void => {
+    setNotificationAnchorEl(null);
   };
 
   const drawer = (
@@ -368,6 +380,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
           {/* Notifications */}
           <IconButton 
+            onClick={handleNotificationClick}
             sx={{ 
               mr: 2,
               color: 'text.secondary',
@@ -390,7 +403,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             }}
           >
             <Badge 
-              badgeContent={3} 
+              badgeContent={unreadCount} 
               sx={{
                 '& .MuiBadge-badge': {
                   background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)',
@@ -545,6 +558,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {children}
         </Box>
       </Box>
+
+      {/* Notification Panel */}
+      <NotificationPanel 
+        anchorEl={notificationAnchorEl} 
+        onClose={handleNotificationClose} 
+      />
     </Box>
   );
 };
