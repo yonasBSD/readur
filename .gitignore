@@ -4,3 +4,4 @@ node_modules/
 .env
 assets/
 frontend/dist/
+.claude/
