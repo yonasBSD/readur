@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo test:*)",
+      "Bash(gh issue view:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(cargo check:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)",
+      "Bash(rm:*)",
+      "Bash(npm run test:unit:*)",
+      "Bash(find:*)",
+      "Bash(npm run test:integration:*)",
+      "Bash(touch:*)",
+      "Bash(curl:*)"
+    ],
+    "deny": []
+  }
+}
